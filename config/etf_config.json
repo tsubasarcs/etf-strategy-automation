@@ -1,0 +1,27 @@
+{
+  "etfs": {
+    "0056": {
+      "name": "元大高股息ETF",
+      "priority": 1,
+      "expected_return": 9.43,
+      "strategy": "最佳表現，優先推薦"
+    },
+    "00878": {
+      "name": "國泰永續高股息ETF", 
+      "priority": 3,
+      "expected_return": 5.56,
+      "strategy": "穩定保守，風險最低"
+    },
+    "00919": {
+      "name": "群益台灣精選高息ETF",
+      "priority": 2, 
+      "expected_return": 6.26,
+      "strategy": "平衡選擇，中等風險"
+    }
+  },
+  "strategy_settings": {
+    "buy_window_days": 7,
+    "target_return": 5.0,
+    "max_hold_days": 60
+  }
+}
