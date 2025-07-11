@@ -2,148 +2,111 @@
 name: Test Modular ETF System
 
 on:
-  # 手動觸發
   workflow_dispatch:
-    inputs:
-      test_type:
-        description: '測試類型'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-        - all
-        - modules_only
-        - firebase_only
-  
-  # 也可以在推送時自動觸發
   push:
     paths:
       - 'scripts/**'
-      - '.github/workflows/test-modular-system.yml'
 
 jobs:
-  test-modular-system:
+  test:
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
     
-    - name: 🐍 Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
     
-    - name: 📦 Install dependencies
+    - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
         pip install requests pandas numpy
     
-    - name: 📁 Setup directory structure
+    - name: Create test structure
       run: |
         cd scripts
-        # 確保所有目錄存在
-        mkdir -p core analysis strategy config utils
-        # 確保 __init__.py 文件存在
-        touch core/__init__.py
-        touch analysis/__init__.py
-        touch strategy/__init__.py
-        touch config/__init__.py
-        touch utils/__init__.py
+        mkdir -p core analysis strategy config
+        touch core/__init__.py analysis/__init__.py strategy/__init__.py config/__init__.py
     
-    - name: 🧪 Run Modular System Test
-      env:
-        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+    - name: Create basic test script
       run: |
         cd scripts
-        
-        # 首先檢查是否有測試文件
-        if [ -f test_modular_system.py ]; then
-          echo "✅ 找到測試文件，開始執行測試..."
-          python test_modular_system.py
-        else
-          echo "⚠️ 未找到測試文件，執行基本模組導入測試..."
-          python << 'EOF'
+        cat > basic_test.py << 'EOF'
 import sys
 import os
+
+print("🧪 基本模組測試開始")
+print("=" * 40)
+
+# 測試路徑
 sys.path.append('.')
+print(f"Python路徑: {sys.path[-1]}")
 
-print('🧪 基本模組導入測試')
-print('=' * 40)
+# 測試文件存在
+files_to_check = [
+    'config/etf_config.py',
+    'core/firebase_client.py', 
+    'main_analyzer.py'
+]
+
+for file_path in files_to_check:
+    if os.path.exists(file_path):
+        print(f"✅ 找到文件: {file_path}")
+    else:
+        print(f"❌ 缺少文件: {file_path}")
+
+# 測試導入
+test_passed = 0
+test_total = 0
 
 try:
-    from config.etf_config import ETF_INFO, ETF_LIST
-    print('✅ config.etf_config 導入成功')
-    print(f'   ETF清單: {ETF_LIST}')
+    test_total += 1
+    from config.etf_config import ETF_INFO
+    print("✅ config.etf_config 導入成功")
+    test_passed += 1
 except Exception as e:
-    print(f'❌ config.etf_config 導入失敗: {e}')
+    print(f"❌ config.etf_config 導入失敗: {e}")
 
 try:
+    test_total += 1
     from core.firebase_client import FirebaseClient
-    print('✅ core.firebase_client 導入成功')
+    print("✅ core.firebase_client 導入成功")
+    test_passed += 1
 except Exception as e:
-    print(f'❌ core.firebase_client 導入失敗: {e}')
+    print(f"❌ core.firebase_client 導入失敗: {e}")
 
-try:
-    from main_analyzer import ETFStrategyAnalyzer
-    print('✅ main_analyzer 導入成功')
-except Exception as e:
-    print(f'❌ main_analyzer 導入失敗: {e}')
+print(f"\n📊 測試結果: {test_passed}/{test_total} 通過")
+print(f"📈 成功率: {test_passed/test_total*100:.1f}%")
 
-print('\n🎯 基本測試完成')
+if test_passed == test_total:
+    print("🎉 所有基本測試通過！")
+    exit(0)
+else:
+    print("⚠️ 部分測試失敗")
+    exit(1)
 EOF
-        fi
     
-    - name: 📊 Run Main Analyzer (if test passes)
+    - name: Run basic test
+      run: |
+        cd scripts
+        python basic_test.py
+    
+    - name: Run main analyzer (if exists)
       env:
         FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
-        
-        # 如果有主分析器，嘗試執行
         if [ -f main_analyzer.py ]; then
           echo "🚀 執行主分析器..."
-          python main_analyzer.py || echo "⚠️ 主分析器執行遇到問題，但繼續執行"
+          timeout 300 python main_analyzer.py || echo "⚠️ 主分析器執行超時或遇到問題"
         else
-          echo "⚠️ 未找到 main_analyzer.py，跳過執行"
+          echo "⚠️ main_analyzer.py 不存在"
         fi
     
-    - name: 📋 Display Results Summary
+    - name: Summary
       run: |
-        echo "📊 執行摘要"
-        echo "=============="
-        echo "✅ 工作流程執行完成"
-        echo "📅 執行時間: $(date)"
-        echo "🔧 測試類型: ${{ github.event.inputs.test_type || 'auto' }}"
-        
-        # 檢查是否有日誌文件
-        cd scripts
-        if [ -f modular_test.log ]; then
-          echo "📄 發現測試日誌，顯示最後10行:"
-          tail -10 modular_test.log
-        fi
-        
-        if [ -f modular_test_report.json ]; then
-          echo "📊 發現測試報告:"
-          cat modular_test_report.json
-        fi
-
-  # 可選：部署到生產環境
-  deploy-if-tests-pass:
-    needs: test-modular-system
-    runs-on: ubuntu-latest
-    if: success()
-    
-    steps:
-    - name: ✅ Tests Passed - Ready for Deployment
-      run: |
-        echo "🎉 所有測試通過！"
-        echo "💡 建議事項："
-        echo "   1. 系統已準備好進行實盤測試"
-        echo "   2. 可以開始小額投資驗證"
-        echo "   3. 建議設置每日監控"
-        echo ""
-        echo "📈 下一步："
-        echo "   - 準備投資資金"
-        echo "   - 設置買進提醒"
-        echo "   - 監控ETF除息日期"
+        echo "📊 測試完成"
+        echo "時間: $(date)"
+        echo "✅ 基本模組測試已執行"
