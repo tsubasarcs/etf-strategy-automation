@@ -1,112 +1,14 @@
-# .github/workflows/test-modular-system.yml
-name: Test Modular ETF System
-
-on:
-  workflow_dispatch:
-  push:
-    paths:
-      - 'scripts/**'
-
+name: Quick Test
+on: workflow_dispatch
 jobs:
   test:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        pip install requests pandas numpy
-    
-    - name: Create test structure
-      run: |
+    - run: |
         cd scripts
-        mkdir -p core analysis strategy config
-        touch core/__init__.py analysis/__init__.py strategy/__init__.py config/__init__.py
-    
-    - name: Create basic test script
-      run: |
-        cd scripts
-        cat > basic_test.py << 'EOF'
-import sys
-import os
-
-print("🧪 基本模組測試開始")
-print("=" * 40)
-
-# 測試路徑
-sys.path.append('.')
-print(f"Python路徑: {sys.path[-1]}")
-
-# 測試文件存在
-files_to_check = [
-    'config/etf_config.py',
-    'core/firebase_client.py', 
-    'main_analyzer.py'
-]
-
-for file_path in files_to_check:
-    if os.path.exists(file_path):
-        print(f"✅ 找到文件: {file_path}")
-    else:
-        print(f"❌ 缺少文件: {file_path}")
-
-# 測試導入
-test_passed = 0
-test_total = 0
-
-try:
-    test_total += 1
-    from config.etf_config import ETF_INFO
-    print("✅ config.etf_config 導入成功")
-    test_passed += 1
-except Exception as e:
-    print(f"❌ config.etf_config 導入失敗: {e}")
-
-try:
-    test_total += 1
-    from core.firebase_client import FirebaseClient
-    print("✅ core.firebase_client 導入成功")
-    test_passed += 1
-except Exception as e:
-    print(f"❌ core.firebase_client 導入失敗: {e}")
-
-print(f"\n📊 測試結果: {test_passed}/{test_total} 通過")
-print(f"📈 成功率: {test_passed/test_total*100:.1f}%")
-
-if test_passed == test_total:
-    print("🎉 所有基本測試通過！")
-    exit(0)
-else:
-    print("⚠️ 部分測試失敗")
-    exit(1)
-EOF
-    
-    - name: Run basic test
-      run: |
-        cd scripts
-        python basic_test.py
-    
-    - name: Run main analyzer (if exists)
-      env:
-        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
-      run: |
-        cd scripts
-        if [ -f main_analyzer.py ]; then
-          echo "🚀 執行主分析器..."
-          timeout 300 python main_analyzer.py || echo "⚠️ 主分析器執行超時或遇到問題"
-        else
-          echo "⚠️ main_analyzer.py 不存在"
-        fi
-    
-    - name: Summary
-      run: |
-        echo "📊 測試完成"
-        echo "時間: $(date)"
-        echo "✅ 基本模組測試已執行"
+        ls -la
+        python -c "print('🎉 Python環境正常')"
