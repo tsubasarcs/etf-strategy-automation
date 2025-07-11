@@ -1,0 +1,35 @@
+name: ETF Daily Analysis
+
+on:
+  schedule:
+    - cron: '0 10 * * 1-5'  # UTC 10:00 = 台北時間 18:00 (工作日)
+  workflow_dispatch:  # 允許手動執行
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests pandas numpy
+        
+    - name: Run ETF analysis
+      run: |
+        python scripts/etf_analyzer.py
+        
+    - name: Commit results
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/ || true
+        git commit -m "Daily ETF analysis $(date)" || exit 0
+        git push || true
