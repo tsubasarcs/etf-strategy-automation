@@ -1,4 +1,4 @@
-name: ETF Daily Analysis
+name: ETF Firebase Analysis
 
 on:
   schedule:
@@ -22,14 +22,17 @@ jobs:
       run: |
         pip install requests pandas numpy
         
-    - name: Run ETF analysis
+    - name: Run ETF Firebase Analysis
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
+        echo "🚀 開始執行ETF Firebase分析..."
+        echo "🔥 Firebase URL: $FIREBASE_URL"
         python scripts/etf_analyzer.py
         
-    - name: Commit results
+    - name: Analysis Summary
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add data/ || true
-        git commit -m "Daily ETF analysis $(date)" || exit 0
-        git push || true
+        echo "✅ ETF分析完成"
+        echo "📊 資料已儲存至Firebase"
+        echo "🎯 可於Firebase控制台查看結果"
+        echo "⏰ 執行時間: $(date)"
