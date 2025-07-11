@@ -1,4 +1,3 @@
-# .github/workflows/test-modular-system.yml
 name: Test Modular ETF System
 
 on:
