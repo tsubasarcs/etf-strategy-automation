@@ -1,3 +1,4 @@
+# .github/workflows/test-modular-system.yml
 name: Test Modular ETF System
 
 on:
@@ -62,7 +63,7 @@ jobs:
           python test_modular_system.py
         else
           echo "⚠️ 未找到測試文件，執行基本模組導入測試..."
-          python -c "
+          python << 'EOF'
 import sys
 import os
 sys.path.append('.')
@@ -71,7 +72,6 @@ print('🧪 基本模組導入測試')
 print('=' * 40)
 
 try:
-    # 測試配置導入
     from config.etf_config import ETF_INFO, ETF_LIST
     print('✅ config.etf_config 導入成功')
     print(f'   ETF清單: {ETF_LIST}')
@@ -79,21 +79,19 @@ except Exception as e:
     print(f'❌ config.etf_config 導入失敗: {e}')
 
 try:
-    # 測試核心模組導入
     from core.firebase_client import FirebaseClient
     print('✅ core.firebase_client 導入成功')
 except Exception as e:
     print(f'❌ core.firebase_client 導入失敗: {e}')
 
 try:
-    # 測試主分析器導入
     from main_analyzer import ETFStrategyAnalyzer
     print('✅ main_analyzer 導入成功')
 except Exception as e:
     print(f'❌ main_analyzer 導入失敗: {e}')
 
-print('\\n🎯 基本測試完成')
-"
+print('\n🎯 基本測試完成')
+EOF
         fi
     
     - name: 📊 Run Main Analyzer (if test passes)
