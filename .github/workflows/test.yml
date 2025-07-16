@@ -1,0 +1,6 @@
+- name: Find Dict error
+  run: |
+    cd scripts
+    python -c "import sys; sys.path.append('.'); from core.firebase_client import FirebaseClient; print('Firebase OK')"
+    python -c "import sys; sys.path.append('.'); from generate_dashboard import ModularDashboard; print('Dashboard OK')"
+    python -c "import sys; sys.path.append('.'); import main_analyzer; print('Main analyzer OK')"
