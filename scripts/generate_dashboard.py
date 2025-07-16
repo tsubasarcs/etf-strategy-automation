@@ -1,5 +1,5 @@
 # generate_dashboard.py
-"""ETF策略儀表板生成器 - 模組化版本"""
+"""ETF策略儀表板生成器 - 支援Firebase和GitHub Pages"""
 
 import sys
 import os
@@ -135,6 +135,26 @@ class ModularDashboard:
         .status-medium {{ background: #fff3cd; color: #856404; }}
         .status-low {{ background: #f8d7da; color: #721c24; }}
         
+        .github-link {{
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 0.9em;
+        }}
+        
+        .refresh-info {{
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }}
+        
         @media (max-width: 768px) {{
             .stats {{ grid-template-columns: 1fr; }}
             .opportunity-meta {{ grid-template-columns: 1fr; }}
@@ -143,10 +163,18 @@ class ModularDashboard:
 </head>
 <body>
     <div class="container">
+        <a href="https://github.com/yourusername/yourrepo" class="github-link">📊 GitHub Repo</a>
+        
         <div class="header">
             <h1>🎯 ETF模組化策略儀表板</h1>
             <p>📅 最後更新: {datetime.fromisoformat(latest_status['last_update']).strftime('%Y-%m-%d %H:%M:%S')}</p>
             <p>🔧 系統版本: {latest_status.get('system_version', 'Unknown')}</p>
+        </div>
+        
+        <div class="refresh-info">
+            <strong>🔄 自動更新：</strong> 每週一到週五 15:30 自動分析並更新 | 
+            <strong>📊 數據來源：</strong> 台灣證交所即時資料 | 
+            <strong>⚠️ 投資警示：</strong> 本系統僅供參考，投資有風險請謹慎評估
         </div>
         
         <div class="stats">
@@ -188,8 +216,9 @@ class ModularDashboard:
         </div>
         
         <div class="footer">
-            <p>🤖 自動生成於: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            <p>📊 數據來源: Firebase即時資料庫</p>
+            <p>🤖 由 ETF模組化策略系統 自動生成</p>
+            <p>📊 資料更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>🔗 透過 GitHub Actions 自動部署到 GitHub Pages</p>
         </div>
     </div>
 </body>
@@ -221,7 +250,7 @@ class ModularDashboard:
             return """
             <div style="text-align: center; padding: 40px; color: #666;">
                 <h3>😴 目前沒有投資機會</h3>
-                <p>系統正在監控中，有機會時會立即通知</p>
+                <p>系統正在監控中，有機會時會立即更新</p>
             </div>
             """
         
@@ -390,11 +419,12 @@ class ModularDashboard:
         """
     
     def save_dashboard(self) -> bool:
-        """保存儀表板到Firebase"""
+        """保存儀表板到Firebase和GitHub Pages"""
         try:
             print("🎨 生成儀表板HTML...")
             html_content = self.generate_dashboard()
             
+            # 1. 保存到Firebase
             dashboard_data = {
                 'html_content': html_content,
                 'generated_at': datetime.now().isoformat(),
@@ -402,19 +432,27 @@ class ModularDashboard:
             }
             
             print("💾 保存儀表板到Firebase...")
-            success = self.firebase_client.save('dashboard/latest', dashboard_data)
+            firebase_success = self.firebase_client.save('dashboard/latest', dashboard_data)
             
-            if success:
-                print("✅ 儀表板已保存到Firebase")
+            if firebase_success:
+                print("✅ Firebase儀表板已保存")
                 
                 # 同時保存到每日歷史
                 daily_key = f"dashboard/history/{datetime.now().strftime('%Y-%m-%d')}"
                 self.firebase_client.save(daily_key, dashboard_data)
-                
-                return True
             else:
-                print("❌ 儀表板保存失敗")
-                return False
+                print("❌ Firebase儀表板保存失敗")
+            
+            # 2. 保存到GitHub Pages
+            print("📄 保存儀表板到GitHub Pages...")
+            github_pages_success = self.save_to_github_pages(html_content)
+            
+            if github_pages_success:
+                print("✅ GitHub Pages儀表板已保存")
+            else:
+                print("❌ GitHub Pages儀表板保存失敗")
+            
+            return firebase_success or github_pages_success
                 
         except Exception as e:
             print(f"❌ 儀表板生成失敗: {e}")
@@ -422,19 +460,34 @@ class ModularDashboard:
             traceback.print_exc()
             return False
     
+    def save_to_github_pages(self, html_content: str) -> bool:
+        """保存儀表板到GitHub Pages"""
+        try:
+            # 保存到當前目錄的index.html
+            with open('index.html', 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            print("📄 index.html 文件已創建")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 保存到GitHub Pages失敗: {e}")
+            return False
+    
     def print_dashboard_url(self):
-        """顯示儀表板URL（如果有的話）"""
+        """顯示儀表板URL"""
         firebase_url = self.firebase_client.firebase_url
         if firebase_url and 'firebasedatabase.app' in firebase_url:
             dashboard_url = f"{firebase_url}/dashboard/latest/html_content.json"
-            print(f"🔗 儀表板數據URL: {dashboard_url}")
-        else:
-            print("💡 請設置Firebase URL以獲取儀表板鏈接")
+            print(f"🔗 Firebase儀表板數據: {dashboard_url}")
+        
+        print(f"🔗 GitHub Pages儀表板: https://yourusername.github.io/yourrepo")
+        print(f"💡 請將上面的URL改為您的實際GitHub Pages地址")
 
 def main():
     """主函數"""
-    print("🎨 ETF策略儀表板生成器")
-    print("=" * 40)
+    print("🎨 ETF策略儀表板生成器 - 支援Firebase和GitHub Pages")
+    print("=" * 60)
     
     try:
         dashboard = ModularDashboard()
@@ -444,8 +497,8 @@ def main():
             print("\n🎉 儀表板生成完成！")
             dashboard.print_dashboard_url()
             print("\n💡 提示：")
-            print("   - 儀表板已保存到Firebase")
-            print("   - 可以通過Firebase數據庫查看")
+            print("   - 儀表板已同時保存到Firebase和GitHub Pages")
+            print("   - GitHub Pages需要幾分鐘時間部署")
             print("   - 建議設置定期更新機制")
         else:
             print("\n💥 儀表板生成失敗")
