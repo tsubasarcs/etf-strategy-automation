@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Dict, List, Optional
 from .etf_data_parser import ETFDataParser
 
 class ETFDataCollector:
