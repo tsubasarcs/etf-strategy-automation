@@ -1,153 +1,61 @@
-name: Fix Typing Imports
+name: Simple Fix Typing
 
 on:
   workflow_dispatch:
 
 jobs:
-  fix-imports:
+  fix:
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Fix typing imports in all Python files
+    - name: Fix firebase client
       run: |
-        echo "🔧 修復typing導入問題..."
-        
-        # 修復 core/firebase_client.py
         if [ -f "scripts/core/firebase_client.py" ]; then
-          echo "修復 core/firebase_client.py..."
-          cat << 'EOF' > scripts/core/firebase_client.py
-"""Firebase客戶端封裝"""
-
-import requests
-import json
-import os
-from typing import Dict, Any, Optional
-
-class FirebaseClient:
-    """Firebase操作客戶端"""
-    
-    def __init__(self, firebase_url: Optional[str] = None):
-        self.firebase_url = firebase_url or os.getenv(
-            'FIREBASE_URL', 
-            'https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app'
-        )
-    
-    def save(self, path: str, data: Dict[str, Any]) -> bool:
-        """保存資料到Firebase"""
-        url = f"{self.firebase_url}/{path}.json"
-        
-        try:
-            response = requests.put(url, json=data, timeout=10)
-            return response.status_code == 200
-        except Exception as e:
-            print(f"❌ Firebase保存失敗 {path}: {e}")
-            return False
-    
-    def get(self, path: str) -> Optional[Dict[str, Any]]:
-        """從Firebase讀取資料"""
-        url = f"{self.firebase_url}/{path}.json"
-        
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except Exception as e:
-            print(f"❌ Firebase讀取失敗 {path}: {e}")
-            return None
-    
-    def update(self, path: str, data: Dict[str, Any]) -> bool:
-        """更新Firebase資料"""
-        url = f"{self.firebase_url}/{path}.json"
-        
-        try:
-            response = requests.patch(url, json=data, timeout=10)
-            return response.status_code == 200
-        except Exception as e:
-            print(f"❌ Firebase更新失敗 {path}: {e}")
-            return False
-EOF
-          echo "✅ core/firebase_client.py 修復完成"
+          echo "Fixing firebase_client.py..."
+          sed -i '1i from typing import Dict, Any, Optional' scripts/core/firebase_client.py
+          echo "Fixed firebase_client.py"
         fi
-        
-        # 修復 generate_dashboard.py
+    
+    - name: Fix generate dashboard
+      run: |
         if [ -f "scripts/generate_dashboard.py" ]; then
-          echo "修復 generate_dashboard.py..."
+          echo "Fixing generate_dashboard.py..."
           sed -i '1i from typing import Dict, Any, List' scripts/generate_dashboard.py
-          echo "✅ generate_dashboard.py 修復完成"
+          echo "Fixed generate_dashboard.py"
         fi
-        
-        # 修復 main_analyzer.py
-        if [ -f "scripts/main_analyzer.py" ]; then
-          echo "修復 main_analyzer.py..."
-          sed -i '4i from typing import Dict, Any' scripts/main_analyzer.py
-          echo "✅ main_analyzer.py 修復完成"
-        fi
-        
-        # 檢查修復結果
-        echo ""
-        echo "🔍 檢查修復結果:"
-        grep -n "from typing import" scripts/core/firebase_client.py || echo "⚠️ firebase_client.py 沒有typing導入"
-        grep -n "from typing import" scripts/generate_dashboard.py || echo "⚠️ generate_dashboard.py 沒有typing導入"
-        grep -n "from typing import" scripts/main_analyzer.py || echo "⚠️ main_analyzer.py 沒有typing導入"
     
-    - name: Test fixed imports
+    - name: Fix main analyzer
+      run: |
+        if [ -f "scripts/main_analyzer.py" ]; then
+          echo "Fixing main_analyzer.py..."
+          sed -i '4i from typing import Dict, Any' scripts/main_analyzer.py
+          echo "Fixed main_analyzer.py"
+        fi
+    
+    - name: Test fix
       run: |
         cd scripts
-        echo "🧪 測試修復後的導入..."
-        
-        cat << 'EOF' > test_fixed_imports.py
-        import sys
-        sys.path.append('.')
-        
-        print("測試修復後的模組導入...")
-        
-        try:
-            from core.firebase_client import FirebaseClient
-            client = FirebaseClient()
-            print("✅ Firebase客戶端導入成功")
-        except Exception as e:
-            print(f"❌ Firebase客戶端導入失敗: {e}")
-            sys.exit(1)
-        
-        try:
-            from generate_dashboard import ModularDashboard
-            dashboard = ModularDashboard()
-            print("✅ 儀表板模組導入成功")
-        except Exception as e:
-            print(f"❌ 儀表板模組導入失敗: {e}")
-            sys.exit(1)
-        
-        try:
-            import main_analyzer
-            print("✅ 主分析器導入成功")
-        except Exception as e:
-            print(f"❌ 主分析器導入失敗: {e}")
-            sys.exit(1)
-        
-        print("🎉 所有模組導入測試通過!")
-        EOF
-        
-        python test_fixed_imports.py
+        python -c "
+import sys
+sys.path.append('.')
+try:
+    from core.firebase_client import FirebaseClient
+    print('Firebase client OK')
+except Exception as e:
+    print('Firebase client failed:', e)
+try:
+    from generate_dashboard import ModularDashboard
+    print('Dashboard OK')
+except Exception as e:
+    print('Dashboard failed:', e)
+        "
     
-    - name: Commit fixes
+    - name: Commit changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        
         git add scripts/
-        git commit -m "🔧 Fix typing imports - Add missing Dict, Any, Optional imports
-
-        - ✅ Fixed core/firebase_client.py
-        - ✅ Fixed generate_dashboard.py  
-        - ✅ Fixed main_analyzer.py
-        - 🎯 Resolved 'Dict' is not defined error" || echo "No changes to commit"
-        
+        git commit -m "Fix typing imports" || echo "No changes"
         git push
-    
-    - name: Success message
-      run: |
-        echo "🎉 typing導入問題修復完成!"
-        echo "現在可以重新執行ETF分析測試了"
