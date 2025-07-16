@@ -1,4 +1,4 @@
-name: Correct YAML Test
+name: Fixed YAML Syntax Test
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
     - name: Test config import
       run: |
         cd scripts
-        python3 << 'PYTHON_SCRIPT'
+        cat > test_config.py << 'EOF'
 import sys
 sys.path.append('.')
 try:
@@ -36,12 +36,13 @@ try:
     print('ETF count:', len(ETF_INFO))
 except Exception as e:
     print('Config import FAILED:', e)
-PYTHON_SCRIPT
+EOF
+        python test_config.py
     
     - name: Test Firebase client
       run: |
         cd scripts
-        python3 << 'PYTHON_SCRIPT'
+        cat > test_firebase.py << 'EOF'
 import sys
 sys.path.append('.')
 try:
@@ -51,12 +52,13 @@ try:
     print('Firebase URL:', client.firebase_url)
 except Exception as e:
     print('Firebase client FAILED:', e)
-PYTHON_SCRIPT
+EOF
+        python test_firebase.py
     
     - name: Test dashboard
       run: |
         cd scripts
-        python3 << 'PYTHON_SCRIPT'
+        cat > test_dashboard.py << 'EOF'
 import sys
 sys.path.append('.')
 try:
@@ -65,12 +67,13 @@ try:
     print('Dashboard creation SUCCESS')
 except Exception as e:
     print('Dashboard creation FAILED:', e)
-PYTHON_SCRIPT
+EOF
+        python test_dashboard.py
     
     - name: Test main analyzer
       run: |
         cd scripts
-        python3 << 'PYTHON_SCRIPT'
+        cat > test_main.py << 'EOF'
 import sys
 sys.path.append('.')
 try:
@@ -82,14 +85,15 @@ try:
         print('No main function')
 except Exception as e:
     print('Main analyzer import FAILED:', e)
-PYTHON_SCRIPT
+EOF
+        python test_main.py
     
     - name: Test Firebase connection
       env:
         FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
-        python3 << 'PYTHON_SCRIPT'
+        cat > test_firebase_full.py << 'EOF'
 import sys
 sys.path.append('.')
 try:
@@ -108,7 +112,8 @@ try:
         print('Firebase get FAILED')
 except Exception as e:
     print('Firebase test FAILED:', e)
-PYTHON_SCRIPT
+EOF
+        python test_firebase_full.py
     
     - name: Final result
       run: |
