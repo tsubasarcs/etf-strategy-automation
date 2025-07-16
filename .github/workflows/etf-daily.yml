@@ -38,7 +38,7 @@ jobs:
     - name: 📦 Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas numpy
+        pip install requests pandas numpy lxml beautifulsoup4
     
     - name: 🔍 Pre-flight check
       run: |
