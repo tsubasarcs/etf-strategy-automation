@@ -75,63 +75,63 @@ jobs:
         cd scripts
         echo "📦 測試模組導入..."
         
-        python << 'EOF'
+        python -c "
 import sys
 import os
 sys.path.append('.')
 
-print("🔍 測試基本導入...")
+print('🔍 測試基本導入...')
 test_results = []
 
 # 測試配置導入
 try:
     from config.etf_config import ETF_INFO, ETF_LIST, DIVIDEND_CALENDAR
-    print(f"✅ config.etf_config 導入成功")
-    print(f"   ETF清單: {ETF_LIST}")
-    print(f"   ETF資訊: {len(ETF_INFO)} 個ETF")
-    test_results.append(("config_import", True))
+    print('✅ config.etf_config 導入成功')
+    print(f'   ETF清單: {ETF_LIST}')
+    print(f'   ETF資訊: {len(ETF_INFO)} 個ETF')
+    test_results.append(('config_import', True))
 except Exception as e:
-    print(f"❌ config.etf_config 導入失敗: {e}")
-    test_results.append(("config_import", False))
+    print(f'❌ config.etf_config 導入失敗: {e}')
+    test_results.append(('config_import', False))
 
 # 測試核心模組導入
 try:
     from core.firebase_client import FirebaseClient
-    print("✅ core.firebase_client 導入成功")
-    test_results.append(("core_import", True))
+    print('✅ core.firebase_client 導入成功')
+    test_results.append(('core_import', True))
 except Exception as e:
-    print(f"❌ core.firebase_client 導入失敗: {e}")
-    test_results.append(("core_import", False))
+    print(f'❌ core.firebase_client 導入失敗: {e}')
+    test_results.append(('core_import', False))
 
 # 測試分析模組導入（如果存在）
 try:
     from analysis.basic_analyzer import BasicDividendAnalyzer
-    print("✅ analysis.basic_analyzer 導入成功")
-    test_results.append(("analysis_import", True))
+    print('✅ analysis.basic_analyzer 導入成功')
+    test_results.append(('analysis_import', True))
 except Exception as e:
-    print(f"⚠️ analysis.basic_analyzer 導入失敗: {e}")
-    test_results.append(("analysis_import", False))
+    print(f'⚠️ analysis.basic_analyzer 導入失敗: {e}')
+    test_results.append(('analysis_import', False))
 
 # 測試策略模組導入（如果存在）
 try:
     from strategy.signal_generator import SignalGenerator
-    print("✅ strategy.signal_generator 導入成功")
-    test_results.append(("strategy_import", True))
+    print('✅ strategy.signal_generator 導入成功')
+    test_results.append(('strategy_import', True))
 except Exception as e:
-    print(f"⚠️ strategy.signal_generator 導入失敗: {e}")
-    test_results.append(("strategy_import", False))
+    print(f'⚠️ strategy.signal_generator 導入失敗: {e}')
+    test_results.append(('strategy_import', False))
 
 # 總結測試結果
 passed = sum(1 for _, result in test_results if result)
 total = len(test_results)
-print(f"\n📊 導入測試結果: {passed}/{total} 通過")
+print(f'\\n📊 導入測試結果: {passed}/{total} 通過')
 
 if passed < 2:  # 至少需要config和core通過
-    print("💥 關鍵模組導入失敗")
+    print('💥 關鍵模組導入失敗')
     sys.exit(1)
 else:
-    print("✅ 基本模組導入測試通過")
-EOF
+    print('✅ 基本模組導入測試通過')
+"
     
     - name: 🔧 Test Firebase client
       env:
@@ -140,7 +140,7 @@ EOF
         cd scripts
         echo "🔗 測試Firebase客戶端..."
         
-        python << 'EOF'
+        python -c "
 import sys
 import os
 sys.path.append('.')
@@ -150,8 +150,8 @@ from core.firebase_client import FirebaseClient
 try:
     # 初始化客戶端
     client = FirebaseClient()
-    print(f"✅ Firebase客戶端初始化成功")
-    print(f"   Firebase URL: {client.firebase_url}")
+    print('✅ Firebase客戶端初始化成功')
+    print(f'   Firebase URL: {client.firebase_url}')
     
     # 測試保存功能
     test_data = {
@@ -160,28 +160,28 @@ try:
         'source': 'github_actions_test'
     }
     
-    print("📤 測試數據保存...")
+    print('📤 測試數據保存...')
     success = client.save('test/github_actions', test_data)
     
     if success:
-        print("✅ Firebase保存測試通過")
+        print('✅ Firebase保存測試通過')
     else:
-        print("⚠️ Firebase保存測試失敗，但不影響其他功能")
+        print('⚠️ Firebase保存測試失敗，但不影響其他功能')
     
     # 測試讀取功能
-    print("📥 測試數據讀取...")
+    print('📥 測試數據讀取...')
     read_data = client.get('test/github_actions')
     
     if read_data and read_data.get('test') == True:
-        print("✅ Firebase讀取測試通過")
+        print('✅ Firebase讀取測試通過')
     else:
-        print("⚠️ Firebase讀取測試失敗")
+        print('⚠️ Firebase讀取測試失敗')
         
 except Exception as e:
-    print(f"❌ Firebase測試失敗: {e}")
+    print(f'❌ Firebase測試失敗: {e}')
     import traceback
     traceback.print_exc()
-EOF
+"
     
     - name: 🎨 Test dashboard generation
       if: ${{ github.event.inputs.test_level == 'full' || github.event.inputs.test_level == 'dashboard_only' }}
@@ -191,7 +191,7 @@ EOF
         cd scripts
         echo "🎨 測試儀表板生成..."
         
-        python << 'EOF'
+        python -c "
 import sys
 import os
 sys.path.append('.')
@@ -199,42 +199,42 @@ sys.path.append('.')
 try:
     from generate_dashboard import ModularDashboard
     
-    print("✅ 儀表板模組導入成功")
+    print('✅ 儀表板模組導入成功')
     
     # 初始化儀表板
     dashboard = ModularDashboard()
-    print("✅ 儀表板初始化成功")
+    print('✅ 儀表板初始化成功')
     
     # 測試HTML生成
     html_content = dashboard.generate_dashboard()
     
     if html_content and len(html_content) > 1000:
-        print("✅ 儀表板HTML生成成功")
-        print(f"   HTML長度: {len(html_content)} 字符")
+        print('✅ 儀表板HTML生成成功')
+        print(f'   HTML長度: {len(html_content)} 字符')
         
         # 檢查HTML內容
         if 'ETF模組化策略儀表板' in html_content:
-            print("✅ 儀表板標題正確")
+            print('✅ 儀表板標題正確')
         if 'opportunity' in html_content.lower():
-            print("✅ 儀表板包含投資機會區塊")
+            print('✅ 儀表板包含投資機會區塊')
             
     else:
-        print("❌ 儀表板HTML生成失敗")
+        print('❌ 儀表板HTML生成失敗')
         
     # 測試保存功能
-    print("💾 測試儀表板保存...")
+    print('💾 測試儀表板保存...')
     success = dashboard.save_dashboard()
     
     if success:
-        print("✅ 儀表板保存測試通過")
+        print('✅ 儀表板保存測試通過')
     else:
-        print("⚠️ 儀表板保存測試失敗")
+        print('⚠️ 儀表板保存測試失敗')
         
 except Exception as e:
-    print(f"❌ 儀表板測試失敗: {e}")
+    print(f'❌ 儀表板測試失敗: {e}')
     import traceback
     traceback.print_exc()
-EOF
+"
     
     - name: 🔄 Test main analyzer
       if: ${{ github.event.inputs.test_level == 'full' || github.event.inputs.test_level == 'analysis_only' }}
@@ -244,49 +244,49 @@ EOF
         cd scripts
         echo "🔄 測試主分析器..."
         
-        timeout 300 python << 'EOF' || echo "⚠️ 主分析器測試超時，但這可能是正常的"
+        timeout 300 python -c "
 import sys
 import os
 sys.path.append('.')
 
 try:
-    print("🚀 測試主分析器導入...")
+    print('🚀 測試主分析器導入...')
     
     # 檢查主分析器文件
     if os.path.exists('main_analyzer.py'):
-        print("✅ main_analyzer.py 文件存在")
+        print('✅ main_analyzer.py 文件存在')
         
         # 嘗試導入主分析器
         import main_analyzer
-        print("✅ main_analyzer 模組導入成功")
+        print('✅ main_analyzer 模組導入成功')
         
         # 檢查是否有主函數
         if hasattr(main_analyzer, 'main'):
-            print("✅ 發現main函數")
+            print('✅ 發現main函數')
             
             # 嘗試執行主函數（設定短時間限制）
-            print("🔄 嘗試執行主分析器...")
+            print('🔄 嘗試執行主分析器...')
             try:
                 result = main_analyzer.main()
                 if result:
-                    print("✅ 主分析器執行成功")
+                    print('✅ 主分析器執行成功')
                 else:
-                    print("⚠️ 主分析器執行完成但返回False")
+                    print('⚠️ 主分析器執行完成但返回False')
             except Exception as e:
-                print(f"⚠️ 主分析器執行遇到問題: {e}")
-                print("   這可能是因為缺少完整的歷史數據")
+                print(f'⚠️ 主分析器執行遇到問題: {e}')
+                print('   這可能是因為缺少完整的歷史數據')
                 
         else:
-            print("❌ main_analyzer沒有main函數")
+            print('❌ main_analyzer沒有main函數')
             
     else:
-        print("❌ main_analyzer.py 文件不存在")
+        print('❌ main_analyzer.py 文件不存在')
         
 except Exception as e:
-    print(f"❌ 主分析器測試失敗: {e}")
+    print(f'❌ 主分析器測試失敗: {e}')
     import traceback
     traceback.print_exc()
-EOF
+" || echo "⚠️ 主分析器測試超時，但這可能是正常的"
     
     - name: 📊 Generate test summary
       run: |
