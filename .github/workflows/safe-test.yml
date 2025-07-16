@@ -1,4 +1,4 @@
-name: Ultra Simple Test
+name: Correct YAML Test
 
 on:
   workflow_dispatch:
@@ -24,16 +24,10 @@ jobs:
         ls -la scripts/config/ || echo "No config folder"
         ls -la scripts/core/ || echo "No core folder"
     
-    - name: Test Python environment
-      run: |
-        cd scripts
-        python -c "print('Python works')"
-        python -c "import sys; print('Python version:', sys.version)"
-    
     - name: Test config import
       run: |
         cd scripts
-        python -c "
+        python3 << 'PYTHON_SCRIPT'
 import sys
 sys.path.append('.')
 try:
@@ -42,12 +36,12 @@ try:
     print('ETF count:', len(ETF_INFO))
 except Exception as e:
     print('Config import FAILED:', e)
-        "
+PYTHON_SCRIPT
     
     - name: Test Firebase client
       run: |
         cd scripts
-        python -c "
+        python3 << 'PYTHON_SCRIPT'
 import sys
 sys.path.append('.')
 try:
@@ -57,12 +51,12 @@ try:
     print('Firebase URL:', client.firebase_url)
 except Exception as e:
     print('Firebase client FAILED:', e)
-        "
+PYTHON_SCRIPT
     
     - name: Test dashboard
       run: |
         cd scripts
-        python -c "
+        python3 << 'PYTHON_SCRIPT'
 import sys
 sys.path.append('.')
 try:
@@ -71,12 +65,12 @@ try:
     print('Dashboard creation SUCCESS')
 except Exception as e:
     print('Dashboard creation FAILED:', e)
-        "
+PYTHON_SCRIPT
     
     - name: Test main analyzer
       run: |
         cd scripts
-        python -c "
+        python3 << 'PYTHON_SCRIPT'
 import sys
 sys.path.append('.')
 try:
@@ -88,9 +82,37 @@ try:
         print('No main function')
 except Exception as e:
     print('Main analyzer import FAILED:', e)
-        "
+PYTHON_SCRIPT
+    
+    - name: Test Firebase connection
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+      run: |
+        cd scripts
+        python3 << 'PYTHON_SCRIPT'
+import sys
+sys.path.append('.')
+try:
+    from core.firebase_client import FirebaseClient
+    client = FirebaseClient()
+    test_data = {"test": True, "timestamp": "2025-07-16"}
+    success = client.save('test/github_actions', test_data)
+    if success:
+        print('Firebase save SUCCESS')
+    else:
+        print('Firebase save FAILED')
+    data = client.get('test/github_actions')
+    if data:
+        print('Firebase get SUCCESS')
+    else:
+        print('Firebase get FAILED')
+except Exception as e:
+    print('Firebase test FAILED:', e)
+PYTHON_SCRIPT
     
     - name: Final result
       run: |
+        echo "=========================================="
         echo "Test completed!"
-        echo "Check above for SUCCESS/FAILED messages"
+        echo "Look for SUCCESS/FAILED messages above"
+        echo "=========================================="
