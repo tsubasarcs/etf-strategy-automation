@@ -4,7 +4,7 @@
 import sys
 import os
 from datetime import datetime, date
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 # 添加當前目錄到Python路徑
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
