@@ -3,15 +3,9 @@ name: ETF Daily Analysis - Modular System
 on:
   schedule:
     # 每天台灣時間 15:30 執行 (UTC+8 = UTC 07:30)
-    # 收盤後執行，使用完整當日數據進行分析
     - cron: '30 7 * * 1-5'
   workflow_dispatch:
     inputs:
-      force_update:
-        description: '強制更新數據'
-        required: false
-        default: 'false'
-        type: boolean
       analysis_mode:
         description: '分析模式'
         required: false
@@ -21,6 +15,15 @@ on:
         - full
         - quick
         - dashboard_only
+
+env:
+  FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+
+# 設置Pages部署權限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   etf-analysis:
@@ -39,16 +42,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install requests pandas numpy lxml beautifulsoup4
-    
-    - name: 🔍 Pre-flight check
-      run: |
-        echo "🚀 ETF模組化分析系統啟動"
-        echo "📅 執行時間: $(date)"
-        echo "🔧 分析模式: ${{ github.event.inputs.analysis_mode || 'full' }}"
-        echo "⚡ 強制更新: ${{ github.event.inputs.force_update || 'false' }}"
-        echo ""
-        echo "📁 檢查文件結構:"
-        find scripts -name "*.py" | head -10
     
     - name: 🧪 Quick module test
       run: |
@@ -75,6 +68,13 @@ jobs:
             sys.exit(1)
         
         try:
+            from core.dividend_collector import DividendDateCollector
+            print("✅ 除息收集器模組")
+        except Exception as e:
+            print(f"❌ 除息收集器失敗: {e}")
+            sys.exit(1)
+        
+        try:
             import main_analyzer
             print("✅ 主分析器模組")
         except Exception as e:
@@ -87,8 +87,6 @@ jobs:
     
     - name: 🔄 Run main analysis
       if: ${{ github.event.inputs.analysis_mode != 'dashboard_only' }}
-      env:
-        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
         echo "🔄 開始執行主分析程式..."
@@ -99,43 +97,41 @@ jobs:
         }
     
     - name: 🎨 Generate dashboard
-      env:
-        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
         echo "🎨 生成投資策略儀表板..."
-        cat << 'EOF' > run_dashboard.py
-        import sys
-        sys.path.append('.')
-        
-        try:
-            from generate_dashboard import ModularDashboard
-            
-            dashboard = ModularDashboard()
-            success = dashboard.save_dashboard()
-            
-            if success:
-                print("✅ 儀表板生成並保存成功")
-                dashboard.print_dashboard_url()
-            else:
-                print("❌ 儀表板生成失敗")
-                sys.exit(1)
-                
-        except Exception as e:
-            print(f"❌ 儀表板生成錯誤: {e}")
-            import traceback
-            traceback.print_exc()
-            sys.exit(1)
-        EOF
-        python run_dashboard.py
+        python generate_dashboard.py
+    
+    - name: 🔍 Verify dashboard creation
+      run: |
+        if [ -f "index.html" ]; then
+          echo "✅ 儀表板文件已創建"
+          echo "📏 文件大小: $(wc -c < index.html) bytes"
+          echo "📄 文件前100字符:"
+          head -c 100 index.html
+        else
+          echo "❌ 儀表板文件未創建"
+          ls -la
+          exit 1
+        fi
+    
+    - name: 📊 Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: 📤 Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '.'
+    
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
     
     - name: 🔍 Verify results
-      env:
-        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
         echo "🔍 驗證分析結果..."
-        cat << 'EOF' > verify_results.py
+        python -c "
         import sys
         sys.path.append('.')
         
@@ -147,31 +143,30 @@ jobs:
             # 檢查最新狀態
             latest_status = client.get('latest_modular_status')
             if latest_status:
-                print("✅ 找到最新分析狀態")
-                print(f"   分析時間: {latest_status.get('last_update', 'Unknown')}")
-                print(f"   系統版本: {latest_status.get('system_version', 'Unknown')}")
+                print('✅ 找到最新分析狀態')
+                print(f'   分析時間: {latest_status.get(\"last_update\", \"Unknown\")}')
+                print(f'   系統版本: {latest_status.get(\"system_version\", \"Unknown\")}')
                 
                 summary = latest_status.get('summary', {})
-                print(f"   投資機會: {summary.get('total_opportunities', 0)}")
-                print(f"   買進信號: {summary.get('buy_signals', 0)}")
-                print(f"   賣出信號: {summary.get('sell_signals', 0)}")
-                print(f"   高信心機會: {summary.get('high_confidence', 0)}")
+                print(f'   投資機會: {summary.get(\"total_opportunities\", 0)}')
+                print(f'   買進信號: {summary.get(\"buy_signals\", 0)}')
+                print(f'   賣出信號: {summary.get(\"sell_signals\", 0)}')
+                print(f'   高信心機會: {summary.get(\"high_confidence\", 0)}')
                 
             else:
-                print("⚠️ 未找到最新分析狀態")
+                print('⚠️ 未找到最新分析狀態')
             
             # 檢查儀表板
             dashboard_data = client.get('dashboard/latest')
             if dashboard_data:
-                print("✅ 儀表板數據已更新")
-                print(f"   生成時間: {dashboard_data.get('generated_at', 'Unknown')}")
+                print('✅ 儀表板數據已更新')
+                print(f'   生成時間: {dashboard_data.get(\"generated_at\", \"Unknown\")}')
             else:
-                print("⚠️ 儀表板數據未找到")
+                print('⚠️ 儀表板數據未找到')
                 
         except Exception as e:
-            print(f"❌ 結果驗證失敗: {e}")
-        EOF
-        python verify_results.py
+            print(f'❌ 結果驗證失敗: {e}')
+        "
     
     - name: 📊 Analysis summary
       run: |
@@ -182,6 +177,7 @@ jobs:
         echo "⏰ 執行時間: $(date '+%H:%M:%S')"
         echo "🔧 系統版本: 模組化 v1.0"
         echo "🎯 分析模式: ${{ github.event.inputs.analysis_mode || 'full' }}"
+        echo "🌐 GitHub Pages: ${{ steps.deployment.outputs.page_url }}"
         echo ""
         echo "✅ 完成的任務:"
         echo "   - 📦 模組導入測試"
@@ -189,10 +185,22 @@ jobs:
           echo "   - 🔄 主分析程式執行"
         fi
         echo "   - 🎨 投資儀表板生成"
+        echo "   - 🚀 GitHub Pages部署"
         echo "   - 🔍 結果驗證"
         echo ""
         echo "🎉 ETF模組化分析系統執行完成!"
         echo "=============================================="
+    
+    - name: 📈 Investment opportunities alert
+      if: success()
+      run: |
+        echo "💰 投資機會提醒:"
+        echo "   - 🌐 GitHub Pages: ${{ steps.deployment.outputs.page_url }}"
+        echo "   - 📊 Firebase: 查看數據庫儀表板"
+        echo "   - 關注高信心度的投資機會"
+        echo "   - 請根據風險承受能力調整投資金額"
+        echo ""
+        echo "⚠️ 風險提醒: 投資有風險，請謹慎決策"
     
     - name: 🚨 Notify if critical issues
       if: failure()
@@ -205,29 +213,3 @@ jobs:
         echo "4. 網路連接是否穩定"
         echo ""
         echo "建議手動執行測試工作流程進行詳細診斷"
-    
-    - name: 📄 Deploy to GitHub Pages
-      if: success()
-      run: |
-        echo "📄 部署儀表板到GitHub Pages..."
-        if [ -f "index.html" ]; then
-          echo "✅ 發現 index.html 文件"
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add index.html
-          git commit -m "🎨 Update ETF dashboard - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No dashboard changes"
-          git push || echo "Push failed, but continuing..."
-        else
-          echo "❌ 未找到 index.html 文件"
-        fi
-    
-    - name: 📈 Investment opportunities alert
-      if: success()
-      run: |
-        echo "💰 投資機會提醒:"
-        echo "   - 🌐 GitHub Pages: https://yourusername.github.io/yourrepo"
-        echo "   - 📊 Firebase: 查看數據庫儀表板"
-        echo "   - 關注高信心度的投資機會"
-        echo "   - 請根據風險承受能力調整投資金額"
-        echo ""
-        echo "⚠️ 風險提醒: 投資有風險，請謹慎決策"
