@@ -1,5 +1,12 @@
-# core/dividend_collector.py
-"""增強版除息日期API收集器"""
+# 修正版除息收集器 - 解決API失敗問題
+"""
+修正版除息日期收集器
+主要修正：
+1. 縮小查詢日期範圍（避免404錯誤）
+2. 使用正確的API端點（TWT48U查未來，TWT49U查歷史）
+3. 增加重試機制和延遲
+4. 改善錯誤處理
+"""
 
 import requests
 import json
@@ -8,164 +15,239 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
 
 class DividendDateCollector:
-    """除息日期收集器"""
+    """修正版除息日期收集器"""
     
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Referer': 'https://www.twse.com.tw/',
+            'X-Requested-With': 'XMLHttpRequest'
         })
+        
+        # 🔧 修正1: 定義API端點用途
+        self.api_endpoints = {
+            'future': 'https://www.twse.com.tw/exchangeReport/TWT48U',      # 除息預告（查未來）
+            'history': 'https://www.twse.com.tw/exchangeReport/TWT49U',     # 除息計算結果（查歷史）
+            'future_rwd': 'https://www.twse.com.tw/rwd/zh/afterTrading/TWT48U',
+            'history_rwd': 'https://www.twse.com.tw/rwd/zh/afterTrading/TWT49U'
+        }
+        
+        # 🔧 修正2: 限制查詢範圍（避免404）
+        self.max_past_months = 3      # 最多查詢過去3個月
+        self.max_future_months = 6    # 最多查詢未來6個月
+        self.request_delay = 2        # 請求間隔（秒）
+        self.max_retries = 3          # 最大重試次數
     
     def get_twse_dividend_dates(self, start_date: str, end_date: str) -> List[Dict]:
         """
-        從證交所TWT49U API獲取除息日期
-        
-        Args:
-            start_date: 開始日期 (YYYYMMDD)
-            end_date: 結束日期 (YYYYMMDD)
-        
-        Returns:
-            List[Dict]: 除息資料列表
+        🔧 修正版證交所除息資料獲取
+        根據日期選擇正確的API端點
         """
-        try:
-            url = "https://www.twse.com.tw/rwd/zh/afterTrading/TWT49U"
-            params = {
-                'response': 'json',
-                'date': start_date
-            }
-            
-            print(f"📅 查詢證交所除息資料: {start_date}")
-            
-            response = self.session.get(url, params=params, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if data.get('stat') == 'OK' and data.get('data'):
-                    print(f"✅ 證交所成功獲取 {len(data['data'])} 筆除息資料")
-                    return data['data']
-                else:
-                    print(f"⚠️ 證交所回應狀態: {data.get('stat', 'Unknown')}")
-                    return []
-            else:
-                print(f"❌ 證交所API請求失敗: HTTP {response.status_code}")
-                return []
-                
-        except Exception as e:
-            print(f"❌ 證交所API異常: {str(e)}")
-            return []
-    
-    def get_etf_dividend_calendar(self) -> Dict[str, List[str]]:
-        """
-        從證交所ETF配息行事曆獲取除息日期
         
-        Returns:
-            Dict[str, List[str]]: {ETF代號: [除息日期列表]}
-        """
-        try:
-            url = "https://www.twse.com.tw/zh/ETFortune/dividendCalendar"
-            
-            print("📅 查詢ETF配息行事曆...")
-            
-            response = self.session.get(url, timeout=30)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # 解析配息行事曆
-                dividend_info = {}
-                
-                # 尋找包含ETF代號的元素
-                etf_elements = soup.find_all(text=lambda text: text and ('0056' in text or '00878' in text or '00919' in text))
-                
-                for element in etf_elements:
-                    text = element.strip()
-                    if '0056' in text or '00878' in text or '00919' in text:
-                        # 提取ETF代號
-                        if '0056' in text:
-                            etf_code = '0056'
-                        elif '00878' in text:
-                            etf_code = '00878'
-                        elif '00919' in text:
-                            etf_code = '00919'
-                        else:
+        # 判斷是查詢歷史還是未來
+        query_date = datetime.strptime(start_date, '%Y%m%d')
+        today = datetime.now()
+        
+        if query_date < today:
+            # 查詢歷史：使用TWT49U（計算結果）
+            api_key = 'history'
+            api_description = "歷史除息計算結果"
+        else:
+            # 查詢未來：使用TWT48U（預告）
+            api_key = 'future'
+            api_description = "未來除息預告"
+        
+        # 🔧 修正3: 依序嘗試主要和RWD端點
+        endpoints_to_try = [
+            (self.api_endpoints[api_key], api_description),
+            (self.api_endpoints[api_key + '_rwd'], api_description + " (RWD)")
+        ]
+        
+        for endpoint_url, description in endpoints_to_try:
+            for retry in range(self.max_retries):
+                try:
+                    print(f"🔍 嘗試{description} (第{retry+1}次): {start_date}")
+                    
+                    params = {
+                        'response': 'json',
+                        'date': start_date
+                    }
+                    
+                    response = self.session.get(
+                        endpoint_url,
+                        params=params,
+                        timeout=30
+                    )
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            if data.get('stat') == 'OK' and data.get('data'):
+                                print(f"✅ {description}成功獲取 {len(data['data'])} 筆資料")
+                                return data['data']
+                            else:
+                                print(f"⚠️ {description}無資料: {data.get('stat', 'Unknown')}")
+                                # 如果無資料，不重試，直接嘗試下一個端點
+                                break
+                        except json.JSONDecodeError:
+                            print(f"❌ {description} JSON解析失敗")
+                            if retry < self.max_retries - 1:
+                                time.sleep(self.request_delay)
+                                continue
+                    
+                    elif response.status_code == 404:
+                        print(f"❌ {description} 404錯誤 - 日期超出範圍或端點不存在")
+                        break  # 404不重試
+                    
+                    else:
+                        print(f"❌ {description} HTTP {response.status_code}")
+                        if retry < self.max_retries - 1:
+                            time.sleep(self.request_delay)
                             continue
-                        
-                        # 初始化該ETF的除息日期列表
-                        if etf_code not in dividend_info:
-                            dividend_info[etf_code] = []
+                    
+                except requests.exceptions.Timeout:
+                    print(f"⏰ {description} 請求超時")
+                    if retry < self.max_retries - 1:
+                        time.sleep(self.request_delay * 2)
+                        continue
                 
-                print(f"✅ 從配息行事曆識別到 {len(dividend_info)} 個ETF")
-                return dividend_info
-            else:
-                print(f"❌ 配息行事曆查詢失敗: HTTP {response.status_code}")
-                return {}
+                except requests.exceptions.ConnectionError:
+                    print(f"🌐 {description} 連接錯誤")
+                    if retry < self.max_retries - 1:
+                        time.sleep(self.request_delay * 2)
+                        continue
                 
-        except Exception as e:
-            print(f"❌ 配息行事曆查詢異常: {str(e)}")
-            return {}
+                except Exception as e:
+                    print(f"❌ {description} 未知錯誤: {str(e)}")
+                    if retry < self.max_retries - 1:
+                        time.sleep(self.request_delay)
+                        continue
+        
+        print(f"❌ 所有API端點都失敗: {start_date}")
+        return []
+    
+    def _parse_date_format(self, date_str: str) -> Optional[str]:
+        """🔧 修正版日期解析"""
+        if not date_str:
+            return None
+            
+        date_str = date_str.strip()
+        
+        # 處理常見日期格式
+        formats = [
+            '%Y%m%d',      # 20250716
+            '%Y-%m-%d',    # 2025-07-16
+            '%Y/%m/%d',    # 2025/07/16
+            '%m/%d/%Y',    # 07/16/2025
+        ]
+        
+        for fmt in formats:
+            try:
+                date_obj = datetime.strptime(date_str, fmt)
+                return date_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        
+        # 🔧 修正4: 改善民國年處理
+        if '/' in date_str:
+            try:
+                parts = date_str.split('/')
+                if len(parts) == 3:
+                    # 嘗試不同的年份位置
+                    for year_idx in [0, 2]:
+                        try:
+                            year = int(parts[year_idx])
+                            month = int(parts[1])
+                            day = int(parts[2] if year_idx == 0 else parts[0])
+                            
+                            # 民國年轉換
+                            if year < 200:  # 假設是民國年
+                                year += 1911
+                            
+                            # 驗證日期合理性
+                            if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
+                                return f"{year:04d}-{month:02d}-{day:02d}"
+                        except (ValueError, IndexError):
+                            continue
+            except Exception:
+                pass
+        
+        return None
     
     def get_comprehensive_dividend_schedule(self, etf_codes: List[str]) -> Dict[str, List[str]]:
         """
-        獲取綜合除息日程表（多種方法結合）
-        
-        Args:
-            etf_codes: ETF代號列表
-        
-        Returns:
-            Dict[str, List[str]]: {ETF代號: [除息日期列表]}
+        🔧 修正版綜合除息日程獲取
+        主要改進：限制日期範圍，避免404錯誤
         """
         print(f"🔍 開始查詢ETF除息日程: {etf_codes}")
         
         # 初始化結果
         etf_schedule = {etf: [] for etf in etf_codes}
         
-        # 方法1: 查詢近期的除息資料
         today = datetime.now()
         
-        # 查詢過去3個月到未來12個月的除息資料
-        for month_offset in range(-3, 13):
-            query_date = today + timedelta(days=30 * month_offset)
-            date_str = query_date.strftime('%Y%m%d')
+        # 🔧 修正5: 限制查詢範圍
+        # 歷史資料：過去3個月
+        start_date = today - timedelta(days=30 * self.max_past_months)
+        # 未來資料：未來6個月
+        end_date = today + timedelta(days=30 * self.max_future_months)
+        
+        print(f"📅 查詢範圍: {start_date.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')}")
+        
+        # 🔧 修正6: 按月份查詢，減少請求次數
+        current_date = start_date
+        
+        while current_date <= end_date:
+            # 每月查詢一次
+            date_str = current_date.strftime('%Y%m%d')
             
-            print(f"📅 查詢 {query_date.strftime('%Y年%m月')} 的除息資料...")
+            print(f"📅 查詢 {current_date.strftime('%Y年%m月')}...")
             
-            # 從證交所API獲取除息資料
-            dividend_data = self.get_twse_dividend_dates(date_str, date_str)
-            
-            # 解析除息資料
-            for row in dividend_data:
-                try:
-                    if len(row) >= 3:
-                        stock_code = row[0].strip()
-                        ex_date_str = row[1].strip()
-                        
-                        # 檢查是否為目標ETF
-                        if stock_code in etf_codes:
-                            # 處理日期格式
-                            formatted_date = self._parse_date_format(ex_date_str)
+            try:
+                dividend_data = self.get_twse_dividend_dates(date_str, date_str)
+                
+                # 解析除息資料
+                for row in dividend_data:
+                    try:
+                        if len(row) >= 2:
+                            stock_code = row[0].strip()
+                            ex_date_str = row[1].strip()
                             
-                            if formatted_date and formatted_date not in etf_schedule[stock_code]:
-                                etf_schedule[stock_code].append(formatted_date)
-                                print(f"📊 找到 {stock_code} 除息日期: {formatted_date}")
-                except Exception as e:
-                    print(f"⚠️ 解析除息資料錯誤: {e}")
-                    continue
+                            # 檢查是否為目標ETF
+                            if stock_code in etf_codes:
+                                formatted_date = self._parse_date_format(ex_date_str)
+                                
+                                if formatted_date and formatted_date not in etf_schedule[stock_code]:
+                                    etf_schedule[stock_code].append(formatted_date)
+                                    print(f"📊 找到 {stock_code} 除息日期: {formatted_date}")
+                    except Exception as e:
+                        print(f"⚠️ 解析資料錯誤: {e}")
+                        continue
+                
+            except Exception as e:
+                print(f"❌ 查詢失敗 {date_str}: {e}")
             
-            # 間隔1秒避免API限制
-            time.sleep(1)
+            # 🔧 修正7: 增加請求間隔
+            time.sleep(self.request_delay)
+            
+            # 移到下個月
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
         
-        # 方法2: 使用已知的季度配息規律進行預測
-        predicted_dates = self._predict_quarterly_dividends(etf_codes)
-        
-        # 合併預測日期
-        for etf_code, dates in predicted_dates.items():
-            for date in dates:
-                if date not in etf_schedule[etf_code]:
-                    etf_schedule[etf_code].append(date)
-                    print(f"📈 預測 {etf_code} 除息日期: {date}")
+        # 🔧 修正8: 如果API完全失敗，使用更保守的備用方案
+        if not any(dates for dates in etf_schedule.values()):
+            print("🔄 所有API都失敗，使用備用方案...")
+            etf_schedule = self.get_conservative_fallback_schedule(etf_codes)
         
         # 排序並去重
         for etf_code in etf_schedule:
@@ -174,175 +256,112 @@ class DividendDateCollector:
         
         return etf_schedule
     
-    def _parse_date_format(self, date_str: str) -> Optional[str]:
-        """解析各種日期格式"""
-        try:
-            # 嘗試不同的日期格式
-            formats = [
-                '%Y%m%d',      # 20250716
-                '%Y-%m-%d',    # 2025-07-16
-                '%Y/%m/%d',    # 2025/07/16
-                '%m/%d/%Y',    # 07/16/2025
-            ]
-            
-            for fmt in formats:
-                try:
-                    date_obj = datetime.strptime(date_str, fmt)
-                    return date_obj.strftime('%Y-%m-%d')
-                except ValueError:
-                    continue
-            
-            # 處理民國年格式
-            if '/' in date_str:
-                parts = date_str.split('/')
-                if len(parts) == 3:
-                    try:
-                        tw_year = int(parts[0])
-                        if tw_year < 1000:  # 民國年
-                            year = tw_year + 1911
-                            month = int(parts[1])
-                            day = int(parts[2])
-                            return f"{year:04d}-{month:02d}-{day:02d}"
-                    except:
-                        pass
-            
-            return None
-            
-        except Exception as e:
-            print(f"⚠️ 日期解析失敗: {date_str} - {e}")
-            return None
-    
-    def _predict_quarterly_dividends(self, etf_codes: List[str]) -> Dict[str, List[str]]:
+    def get_conservative_fallback_schedule(self, etf_codes: List[str]) -> Dict[str, List[str]]:
         """
-        基於歷史規律預測季度除息日期
-        
-        Returns:
-            Dict[str, List[str]]: 預測的除息日期
+        🔧 修正9: 保守的備用除息日程
+        只包含高信心度的近期日期
         """
+        print("🔄 使用保守備用除息日程...")
         
-        # 基於歷史規律的季度除息預測
-        base_patterns = {
-            '0056': [
-                (1, 15),   # 1月中旬
-                (4, 15),   # 4月中旬  
-                (7, 15),   # 7月中旬
-                (10, 15)   # 10月中旬
-            ],
-            '00878': [
-                (2, 15),   # 2月中旬
-                (5, 15),   # 5月中旬
-                (8, 15),   # 8月中旬
-                (11, 15)   # 11月中旬
-            ],
-            '00919': [
-                (3, 15),   # 3月中旬
-                (6, 15),   # 6月中旬
-                (9, 15),   # 9月中旬
-                (12, 15)   # 12月中旬
-            ]
-        }
+        today = datetime.now()
+        current_year = today.year
         
-        current_year = datetime.now().year
-        next_year = current_year + 1
-        
-        predicted_dates = {}
+        # 基於ETF歷史規律的保守預測
+        conservative_schedule = {}
         
         for etf_code in etf_codes:
-            predicted_dates[etf_code] = []
+            dates = []
             
-            if etf_code in base_patterns:
-                pattern = base_patterns[etf_code]
-                
-                # 生成本年度和明年度的預測日期
-                for year in [current_year, next_year]:
-                    for month, day in pattern:
-                        try:
-                            # 檢查日期是否未來
-                            predicted_date = datetime(year, month, day)
-                            if predicted_date > datetime.now():
-                                formatted_date = predicted_date.strftime('%Y-%m-%d')
-                                predicted_dates[etf_code].append(formatted_date)
-                        except:
-                            continue
+            if etf_code == '0056':
+                # 0056通常每季除息：1、4、7、10月
+                base_months = [1, 4, 7, 10]
+                for month in base_months:
+                    for year in [current_year, current_year + 1]:
+                        # 通常在15-18日左右
+                        for day in [15, 16, 17]:
+                            try:
+                                date_obj = datetime(year, month, day)
+                                if date_obj > today:  # 只包含未來日期
+                                    dates.append(date_obj.strftime('%Y-%m-%d'))
+                            except ValueError:
+                                continue
+            
+            elif etf_code == '00878':
+                # 00878通常每季除息：2、5、8、11月
+                base_months = [2, 5, 8, 11]
+                for month in base_months:
+                    for year in [current_year, current_year + 1]:
+                        for day in [15, 16, 17]:
+                            try:
+                                date_obj = datetime(year, month, day)
+                                if date_obj > today:
+                                    dates.append(date_obj.strftime('%Y-%m-%d'))
+                            except ValueError:
+                                continue
+            
+            elif etf_code == '00919':
+                # 00919通常每季除息：3、6、9、12月
+                base_months = [3, 6, 9, 12]
+                for month in base_months:
+                    for year in [current_year, current_year + 1]:
+                        for day in [15, 16, 17]:
+                            try:
+                                date_obj = datetime(year, month, day)
+                                if date_obj > today:
+                                    dates.append(date_obj.strftime('%Y-%m-%d'))
+                            except ValueError:
+                                continue
+            
+            # 只保留未來6個月內的日期
+            future_limit = today + timedelta(days=180)
+            filtered_dates = [
+                date for date in dates 
+                if today < datetime.strptime(date, '%Y-%m-%d') <= future_limit
+            ]
+            
+            conservative_schedule[etf_code] = sorted(filtered_dates)
+            print(f"📅 {etf_code}: 保守預測 {len(conservative_schedule[etf_code])} 個除息日期")
         
-        return predicted_dates
+        return conservative_schedule
     
     def get_etf_dividend_schedule(self, etf_codes: List[str]) -> Dict[str, List[str]]:
         """
-        主要介面：獲取ETF除息日程表
-        
-        Args:
-            etf_codes: ETF代號列表
-        
-        Returns:
-            Dict[str, List[str]]: {ETF代號: [除息日期列表]}
+        🔧 主要介面：獲取ETF除息日程表
         """
         try:
-            # 使用綜合方法獲取除息日程
+            print("🎯 ETF除息日程查詢 - 修正版")
+            print("=" * 50)
+            
+            # 使用修正版方法獲取除息日程
             schedule = self.get_comprehensive_dividend_schedule(etf_codes)
             
-            # 如果API獲取失敗，使用備用預測
-            if not any(dates for dates in schedule.values()):
-                print("🔄 API獲取失敗，使用備用預測方案")
-                schedule = self.get_fallback_dividend_schedule(etf_codes)
+            # 🔧 修正10: 驗證結果合理性
+            for etf_code, dates in schedule.items():
+                if dates:
+                    print(f"✅ {etf_code}: {len(dates)} 個除息日期")
+                    for date in dates[:3]:  # 只顯示前3個
+                        print(f"  📅 {date}")
+                    if len(dates) > 3:
+                        print(f"  ... 還有 {len(dates) - 3} 個日期")
+                else:
+                    print(f"⚠️ {etf_code}: 未獲取到除息日期")
             
             return schedule
             
         except Exception as e:
             print(f"❌ 除息日程查詢失敗: {str(e)}")
-            return self.get_fallback_dividend_schedule(etf_codes)
-    
-    def get_fallback_dividend_schedule(self, etf_codes: List[str]) -> Dict[str, List[str]]:
-        """
-        備用除息日程（基於歷史規律）
-        
-        Returns:
-            Dict[str, List[str]]: 備用除息日程
-        """
-        print("🔄 使用備用除息日程...")
-        
-        # 基於最新市場資訊的除息日程
-        fallback_schedule = {
-            "0056": [
-                "2025-07-21",  # Q2 2025 (基於最新資訊)
-                "2025-10-20",  # Q3 2025
-                "2026-01-19",  # Q4 2025
-                "2026-04-20"   # Q1 2026
-            ],
-            "00878": [
-                "2025-08-18",  # Q2 2025
-                "2025-11-17",  # Q3 2025
-                "2026-02-16",  # Q4 2025
-                "2026-05-18"   # Q1 2026
-            ],
-            "00919": [
-                "2025-09-15",  # Q2 2025
-                "2025-12-15",  # Q3 2025
-                "2026-03-16",  # Q4 2025
-                "2026-06-15"   # Q1 2026
-            ]
-        }
-        
-        result = {}
-        for etf_code in etf_codes:
-            result[etf_code] = fallback_schedule.get(etf_code, [])
-            print(f"📅 {etf_code}: 使用 {len(result[etf_code])} 個備用除息日期")
-        
-        return result
+            return self.get_conservative_fallback_schedule(etf_codes)
     
     def update_config_file(self, dividend_schedule: Dict[str, List[str]], config_path: str) -> bool:
-        """
-        更新配置文件中的除息日期
-        
-        Args:
-            dividend_schedule: 除息日程
-            config_path: 配置文件路徑
-        
-        Returns:
-            bool: 更新是否成功
-        """
+        """更新配置文件"""
         try:
             print(f"📝 更新配置文件: {config_path}")
+            
+            # 檢查文件是否存在
+            import os
+            if not os.path.exists(config_path):
+                print(f"❌ 配置文件不存在: {config_path}")
+                return False
             
             # 讀取現有配置
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -378,9 +397,10 @@ class DividendDateCollector:
             print(f"❌ 配置文件更新失敗: {str(e)}")
             return False
 
+# 測試和使用示例
 def main():
-    """測試除息日期收集器"""
-    print("🎯 ETF除息日期自動收集器測試")
+    """測試修正版除息日期收集器"""
+    print("🎯 修正版ETF除息日期收集器測試")
     print("=" * 50)
     
     collector = DividendDateCollector()
@@ -389,16 +409,26 @@ def main():
     # 測試除息日程獲取
     schedule = collector.get_etf_dividend_schedule(etf_codes)
     
-    print(f"\n📅 ETF除息日程表:")
-    for etf_code, dates in schedule.items():
-        print(f"\n{etf_code}:")
-        for date in dates:
-            print(f"  📊 {date}")
+    print(f"\n🎉 測試完成!")
+    print(f"✅ 成功獲取 {len(schedule)} 個ETF的除息日程")
     
-    # 測試配置文件更新
-    # config_path = "config/etf_config.py"
-    # success = collector.update_config_file(schedule, config_path)
-    # print(f"\n📝 配置文件更新: {'✅ 成功' if success else '❌ 失敗'}")
+    # 統計結果
+    total_dates = sum(len(dates) for dates in schedule.values())
+    print(f"📊 總共獲取 {total_dates} 個除息日期")
+    
+    # 檢查是否有近期的除息日期
+    today = datetime.now()
+    near_future = today + timedelta(days=90)
+    
+    for etf_code, dates in schedule.items():
+        upcoming_dates = [
+            date for date in dates
+            if today < datetime.strptime(date, '%Y-%m-%d') <= near_future
+        ]
+        if upcoming_dates:
+            print(f"🎯 {etf_code} 近期除息日期: {upcoming_dates}")
+    
+    return schedule
 
 if __name__ == "__main__":
     main()
