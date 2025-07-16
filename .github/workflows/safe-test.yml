@@ -1,4 +1,4 @@
-name: Fixed YAML Syntax Test
+name: Correct GitHub Actions Test
 
 on:
   workflow_dispatch:
@@ -27,65 +27,65 @@ jobs:
     - name: Test config import
       run: |
         cd scripts
-        cat > test_config.py << 'EOF'
-import sys
-sys.path.append('.')
-try:
-    from config.etf_config import ETF_INFO
-    print('Config import SUCCESS')
-    print('ETF count:', len(ETF_INFO))
-except Exception as e:
-    print('Config import FAILED:', e)
-EOF
+        cat << 'EOF' > test_config.py
+        import sys
+        sys.path.append('.')
+        try:
+            from config.etf_config import ETF_INFO
+            print('Config import SUCCESS')
+            print('ETF count:', len(ETF_INFO))
+        except Exception as e:
+            print('Config import FAILED:', e)
+        EOF
         python test_config.py
     
     - name: Test Firebase client
       run: |
         cd scripts
-        cat > test_firebase.py << 'EOF'
-import sys
-sys.path.append('.')
-try:
-    from core.firebase_client import FirebaseClient
-    client = FirebaseClient()
-    print('Firebase client SUCCESS')
-    print('Firebase URL:', client.firebase_url)
-except Exception as e:
-    print('Firebase client FAILED:', e)
-EOF
+        cat << 'EOF' > test_firebase.py
+        import sys
+        sys.path.append('.')
+        try:
+            from core.firebase_client import FirebaseClient
+            client = FirebaseClient()
+            print('Firebase client SUCCESS')
+            print('Firebase URL:', client.firebase_url)
+        except Exception as e:
+            print('Firebase client FAILED:', e)
+        EOF
         python test_firebase.py
     
     - name: Test dashboard
       run: |
         cd scripts
-        cat > test_dashboard.py << 'EOF'
-import sys
-sys.path.append('.')
-try:
-    from generate_dashboard import ModularDashboard
-    dashboard = ModularDashboard()
-    print('Dashboard creation SUCCESS')
-except Exception as e:
-    print('Dashboard creation FAILED:', e)
-EOF
+        cat << 'EOF' > test_dashboard.py
+        import sys
+        sys.path.append('.')
+        try:
+            from generate_dashboard import ModularDashboard
+            dashboard = ModularDashboard()
+            print('Dashboard creation SUCCESS')
+        except Exception as e:
+            print('Dashboard creation FAILED:', e)
+        EOF
         python test_dashboard.py
     
     - name: Test main analyzer
       run: |
         cd scripts
-        cat > test_main.py << 'EOF'
-import sys
-sys.path.append('.')
-try:
-    import main_analyzer
-    print('Main analyzer import SUCCESS')
-    if hasattr(main_analyzer, 'main'):
-        print('Main function found')
-    else:
-        print('No main function')
-except Exception as e:
-    print('Main analyzer import FAILED:', e)
-EOF
+        cat << 'EOF' > test_main.py
+        import sys
+        sys.path.append('.')
+        try:
+            import main_analyzer
+            print('Main analyzer import SUCCESS')
+            if hasattr(main_analyzer, 'main'):
+                print('Main function found')
+            else:
+                print('No main function')
+        except Exception as e:
+            print('Main analyzer import FAILED:', e)
+        EOF
         python test_main.py
     
     - name: Test Firebase connection
@@ -93,26 +93,26 @@ EOF
         FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
-        cat > test_firebase_full.py << 'EOF'
-import sys
-sys.path.append('.')
-try:
-    from core.firebase_client import FirebaseClient
-    client = FirebaseClient()
-    test_data = {"test": True, "timestamp": "2025-07-16"}
-    success = client.save('test/github_actions', test_data)
-    if success:
-        print('Firebase save SUCCESS')
-    else:
-        print('Firebase save FAILED')
-    data = client.get('test/github_actions')
-    if data:
-        print('Firebase get SUCCESS')
-    else:
-        print('Firebase get FAILED')
-except Exception as e:
-    print('Firebase test FAILED:', e)
-EOF
+        cat << 'EOF' > test_firebase_full.py
+        import sys
+        sys.path.append('.')
+        try:
+            from core.firebase_client import FirebaseClient
+            client = FirebaseClient()
+            test_data = {"test": True, "timestamp": "2025-07-16"}
+            success = client.save('test/github_actions', test_data)
+            if success:
+                print('Firebase save SUCCESS')
+            else:
+                print('Firebase save FAILED')
+            data = client.get('test/github_actions')
+            if data:
+                print('Firebase get SUCCESS')
+            else:
+                print('Firebase get FAILED')
+        except Exception as e:
+            print('Firebase test FAILED:', e)
+        EOF
         python test_firebase_full.py
     
     - name: Final result
