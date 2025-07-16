@@ -84,9 +84,7 @@ class ETFStrategyAnalyzer:
             print("📅 從API更新除息日程表...")
             
             # 獲取最新的除息日程
-            schedule = self.dividend_collector.get_etf_dividend_schedule(
-                ETF_LIST, months_ahead=18  # 查詢未來18個月
-            )
+            schedule = self.dividend_collector.get_etf_dividend_schedule(ETF_LIST)
             
             # 更新配置文件
             config_path = os.path.join(os.path.dirname(__file__), "config", "etf_config.py")
