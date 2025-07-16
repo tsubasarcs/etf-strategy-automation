@@ -1,5 +1,5 @@
 # generate_dashboard.py
-"""ETF策略儀表板生成器 - 支援Firebase和GitHub Pages"""
+"""ETF策略儀表板生成器 - 最終版（支援Firebase和GitHub Pages）"""
 
 import sys
 import os
@@ -158,12 +158,13 @@ class ModularDashboard:
         @media (max-width: 768px) {{
             .stats {{ grid-template-columns: 1fr; }}
             .opportunity-meta {{ grid-template-columns: 1fr; }}
+            .github-link {{ position: static; margin-bottom: 20px; display: block; text-align: center; }}
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="https://github.com/yourusername/yourrepo" class="github-link">📊 GitHub Repo</a>
+        <a href="https://github.com" class="github-link">📊 GitHub Repo</a>
         
         <div class="header">
             <h1>🎯 ETF模組化策略儀表板</h1>
@@ -461,17 +462,39 @@ class ModularDashboard:
             return False
     
     def save_to_github_pages(self, html_content: str) -> bool:
-        """保存儀表板到GitHub Pages"""
+        """保存儀表板到GitHub Pages（根目錄）"""
         try:
-            # 保存到當前目錄的index.html
-            with open('index.html', 'w', encoding='utf-8') as f:
+            # 獲取當前腳本的路徑
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # 獲取倉庫根目錄（scripts的上一層）
+            repo_root = os.path.dirname(current_dir)
+            # 構建index.html的完整路徑
+            index_path = os.path.join(repo_root, 'index.html')
+            
+            print(f"📄 準備保存到: {index_path}")
+            
+            # 確保目錄存在
+            os.makedirs(os.path.dirname(index_path), exist_ok=True)
+            
+            # 寫入HTML文件
+            with open(index_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
-            print("📄 index.html 文件已創建")
-            return True
+            print(f"✅ index.html 文件已創建於: {index_path}")
             
+            # 驗證文件是否確實存在
+            if os.path.exists(index_path):
+                file_size = os.path.getsize(index_path)
+                print(f"📏 文件大小: {file_size} bytes")
+                return True
+            else:
+                print("❌ 文件創建後未找到")
+                return False
+                
         except Exception as e:
             print(f"❌ 保存到GitHub Pages失敗: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def print_dashboard_url(self):
@@ -486,8 +509,8 @@ class ModularDashboard:
 
 def main():
     """主函數"""
-    print("🎨 ETF策略儀表板生成器 - 支援Firebase和GitHub Pages")
-    print("=" * 60)
+    print("🎨 ETF策略儀表板生成器 - 最終版（支援Firebase和GitHub Pages）")
+    print("=" * 70)
     
     try:
         dashboard = ModularDashboard()
@@ -499,12 +522,14 @@ def main():
             print("\n💡 提示：")
             print("   - 儀表板已同時保存到Firebase和GitHub Pages")
             print("   - GitHub Pages需要幾分鐘時間部署")
-            print("   - 建議設置定期更新機制")
+            print("   - index.html已創建在倉庫根目錄")
+            print("   - 建議檢查GitHub Pages設置是否啟用")
         else:
             print("\n💥 儀表板生成失敗")
             print("🔍 請檢查:")
             print("   - Firebase URL是否正確設置")
             print("   - 網絡連接是否正常")
+            print("   - 文件寫入權限是否正確")
             print("   - 是否有分析數據")
         
     except Exception as e:
