@@ -206,11 +206,27 @@ jobs:
         echo ""
         echo "建議手動執行測試工作流程進行詳細診斷"
     
+    - name: 📄 Deploy to GitHub Pages
+      if: success()
+      run: |
+        echo "📄 部署儀表板到GitHub Pages..."
+        if [ -f "index.html" ]; then
+          echo "✅ 發現 index.html 文件"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add index.html
+          git commit -m "🎨 Update ETF dashboard - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No dashboard changes"
+          git push || echo "Push failed, but continuing..."
+        else
+          echo "❌ 未找到 index.html 文件"
+        fi
+    
     - name: 📈 Investment opportunities alert
       if: success()
       run: |
         echo "💰 投資機會提醒:"
-        echo "   - 請查看Firebase儀表板獲取最新投資建議"
+        echo "   - 🌐 GitHub Pages: https://yourusername.github.io/yourrepo"
+        echo "   - 📊 Firebase: 查看數據庫儀表板"
         echo "   - 關注高信心度的投資機會"
         echo "   - 請根據風險承受能力調整投資金額"
         echo ""
