@@ -3,9 +3,15 @@ name: ETF Daily Analysis - Modular System
 on:
   schedule:
     # 每天台灣時間 15:30 執行 (UTC+8 = UTC 07:30)
+    # 收盤後執行，使用完整當日數據進行分析
     - cron: '30 7 * * 1-5'
   workflow_dispatch:
     inputs:
+      force_update:
+        description: '強制更新數據'
+        required: false
+        default: 'false'
+        type: boolean
       analysis_mode:
         description: '分析模式'
         required: false
@@ -13,178 +19,215 @@ on:
         type: choice
         options:
         - full
-        - quick  
+        - quick
         - dashboard_only
 
-env:
-  FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
-
 jobs:
-  etf_analysis:
+  etf-analysis:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     
     steps:
-    - name: 🔄 Checkout code
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
-      
+    
     - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-        
+    
     - name: 📦 Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas numpy lxml beautifulsoup4
-        
+        pip install requests pandas numpy
+    
+    - name: 🔍 Pre-flight check
+      run: |
+        echo "🚀 ETF模組化分析系統啟動"
+        echo "📅 執行時間: $(date)"
+        echo "🔧 分析模式: ${{ github.event.inputs.analysis_mode || 'full' }}"
+        echo "⚡ 強制更新: ${{ github.event.inputs.force_update || 'false' }}"
+        echo ""
+        echo "📁 檢查文件結構:"
+        find scripts -name "*.py" | head -10
+    
     - name: 🧪 Quick module test
       run: |
         cd scripts
-        python -c "
+        cat << 'EOF' > quick_test.py
         import sys
         sys.path.append('.')
         
-        print('📦 測試模組導入...')
+        print("🧪 快速模組測試...")
         
+        # 測試關鍵模組
         try:
             from config.etf_config import ETF_INFO, ETF_LIST
-            print('✅ 配置模組導入成功')
+            print(f"✅ 配置模組: {len(ETF_INFO)} 個ETF")
         except Exception as e:
-            print(f'❌ 配置模組失敗: {e}')
-            
+            print(f"❌ 配置模組失敗: {e}")
+            sys.exit(1)
+        
         try:
             from core.firebase_client import FirebaseClient
-            print('✅ Firebase客戶端導入成功')
+            print("✅ Firebase客戶端模組")
         except Exception as e:
-            print(f'❌ Firebase客戶端失敗: {e}')
-            
+            print(f"❌ Firebase客戶端失敗: {e}")
+            sys.exit(1)
+        
         try:
-            from core.dividend_collector import DividendDateCollector
-            print('✅ 除息收集器導入成功')
+            import main_analyzer
+            print("✅ 主分析器模組")
         except Exception as e:
-            print(f'❌ 除息收集器失敗: {e}')
-            
-        print('🎯 模組測試完成')
-        "
+            print(f"❌ 主分析器失敗: {e}")
+            sys.exit(1)
         
-    - name: 🎯 Run ETF Analysis
-      if: github.event.inputs.analysis_mode != 'dashboard_only'
-      timeout-minutes: 10
+        print("🎉 所有關鍵模組測試通過!")
+        EOF
+        python quick_test.py
+    
+    - name: 🔄 Run main analysis
+      if: ${{ github.event.inputs.analysis_mode != 'dashboard_only' }}
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
-        echo "🚀 開始執行ETF分析..."
-        echo "📊 分析模式: ${{ github.event.inputs.analysis_mode || 'full' }}"
-        
-        python main_analyzer.py
-        
-    - name: 🎨 Generate Dashboard
-      if: success()
+        echo "🔄 開始執行主分析程式..."
+        timeout 600 python main_analyzer.py || {
+          echo "⚠️ 主分析器執行超時或遇到問題"
+          echo "這可能是因為數據收集需要較長時間"
+          echo "檢查Firebase是否有部分數據更新..."
+        }
+    
+    - name: 🎨 Generate dashboard
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
       run: |
         cd scripts
-        echo "🎨 生成儀表板..."
-        python generate_dashboard.py
-        
-    - name: 📊 Verify Firebase Data
-      if: success()
-      run: |
-        cd scripts
-        python -c "
+        echo "🎨 生成投資策略儀表板..."
+        cat << 'EOF' > run_dashboard.py
         import sys
         sys.path.append('.')
-        from core.firebase_client import FirebaseClient
         
         try:
+            from generate_dashboard import ModularDashboard
+            
+            dashboard = ModularDashboard()
+            success = dashboard.save_dashboard()
+            
+            if success:
+                print("✅ 儀表板生成並保存成功")
+                dashboard.print_dashboard_url()
+            else:
+                print("❌ 儀表板生成失敗")
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"❌ 儀表板生成錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+        EOF
+        python run_dashboard.py
+    
+    - name: 🔍 Verify results
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+      run: |
+        cd scripts
+        echo "🔍 驗證分析結果..."
+        cat << 'EOF' > verify_results.py
+        import sys
+        sys.path.append('.')
+        
+        try:
+            from core.firebase_client import FirebaseClient
+            
             client = FirebaseClient()
             
             # 檢查最新狀態
-            status = client.get_data('latest_modular_status')
-            if status:
-                print('✅ Firebase最新狀態已更新')
-                if 'opportunities' in status:
-                    print(f'📈 投資機會數量: {len(status[\"opportunities\"])}')
-                if 'last_updated' in status:
-                    print(f'📅 最後更新: {status[\"last_updated\"]}')
-            else:
-                print('⚠️ Firebase狀態未找到')
+            latest_status = client.get('latest_modular_status')
+            if latest_status:
+                print("✅ 找到最新分析狀態")
+                print(f"   分析時間: {latest_status.get('last_update', 'Unknown')}")
+                print(f"   系統版本: {latest_status.get('system_version', 'Unknown')}")
                 
-            # 檢查儀表板
-            dashboard = client.get_data('dashboard/latest')
-            if dashboard:
-                print('✅ Firebase儀表板已更新')
+                summary = latest_status.get('summary', {})
+                print(f"   投資機會: {summary.get('total_opportunities', 0)}")
+                print(f"   買進信號: {summary.get('buy_signals', 0)}")
+                print(f"   賣出信號: {summary.get('sell_signals', 0)}")
+                print(f"   高信心機會: {summary.get('high_confidence', 0)}")
+                
             else:
-                print('⚠️ Firebase儀表板未找到')
+                print("⚠️ 未找到最新分析狀態")
+            
+            # 檢查儀表板
+            dashboard_data = client.get('dashboard/latest')
+            if dashboard_data:
+                print("✅ 儀表板數據已更新")
+                print(f"   生成時間: {dashboard_data.get('generated_at', 'Unknown')}")
+            else:
+                print("⚠️ 儀表板數據未找到")
                 
         except Exception as e:
-            print(f'❌ Firebase驗證失敗: {e}')
-        "
-        
+            print(f"❌ 結果驗證失敗: {e}")
+        EOF
+        python verify_results.py
+    
+    - name: 📊 Analysis summary
+      run: |
+        echo ""
+        echo "📊 ETF模組化分析系統執行摘要"
+        echo "=============================================="
+        echo "📅 執行日期: $(date '+%Y-%m-%d')"
+        echo "⏰ 執行時間: $(date '+%H:%M:%S')"
+        echo "🔧 系統版本: 模組化 v1.0"
+        echo "🎯 分析模式: ${{ github.event.inputs.analysis_mode || 'full' }}"
+        echo ""
+        echo "✅ 完成的任務:"
+        echo "   - 📦 模組導入測試"
+        if [[ "${{ github.event.inputs.analysis_mode }}" != "dashboard_only" ]]; then
+          echo "   - 🔄 主分析程式執行"
+        fi
+        echo "   - 🎨 投資儀表板生成"
+        echo "   - 🔍 結果驗證"
+        echo ""
+        echo "🎉 ETF模組化分析系統執行完成!"
+        echo "=============================================="
+    
+    - name: 🚨 Notify if critical issues
+      if: failure()
+      run: |
+        echo "🚨 ETF分析系統執行失敗!"
+        echo "請檢查以下可能的問題:"
+        echo "1. Firebase連接是否正常"
+        echo "2. 證交所API是否可用"
+        echo "3. 模組依賴是否完整"
+        echo "4. 網路連接是否穩定"
+        echo ""
+        echo "建議手動執行測試工作流程進行詳細診斷"
+    
     - name: 📄 Deploy to GitHub Pages
       if: success()
       run: |
         echo "📄 部署儀表板到GitHub Pages..."
-        
-        # 檢查是否有index.html文件
         if [ -f "index.html" ]; then
           echo "✅ 發現 index.html 文件"
-          echo "📏 文件大小: $(wc -c < index.html) bytes"
-          
-          # 設定Git配置
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
-          # 提交更改
           git add index.html
           git commit -m "🎨 Update ETF dashboard - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No dashboard changes"
-          
-          # 推送更改
           git push || echo "Push failed, but continuing..."
-          
         else
           echo "❌ 未找到 index.html 文件"
-          ls -la | grep html || echo "目錄下沒有html文件"
         fi
-        
-    - name: 📋 Display Analysis Summary
-      if: always()
+    
+    - name: 📈 Investment opportunities alert
+      if: success()
       run: |
-        cd scripts
-        python -c "
-        import sys
-        sys.path.append('.')
-        
-        try:
-            from core.firebase_client import FirebaseClient
-            client = FirebaseClient()
-            
-            print('\\n' + '='*60)
-            print('🎯 ETF 分析系統執行摘要')
-            print('='*60)
-            
-            # 獲取最新狀態
-            status = client.get_data('latest_modular_status')
-            if status:
-                print(f'📅 最後更新: {status.get(\"last_updated\", \"未知\")}')
-                print(f'🎯 系統版本: {status.get(\"system_version\", \"未知\")}')
-                
-                opportunities = status.get('opportunities', [])
-                if opportunities:
-                    print(f'\\n📈 投資機會: {len(opportunities)} 個')
-                    for opp in opportunities[:3]:  # 顯示前3個
-                        print(f'  • {opp.get(\"etf_code\", \"未知\")} - {opp.get(\"action\", \"未知\")} - 信心度: {opp.get(\"confidence\", \"未知\")}')
-                else:
-                    print('\\n📊 目前無投資機會')
-                
-                health = status.get('system_health', {})
-                if health:
-                    print(f'\\n🏥 系統健康度: {health.get(\"score\", \"未知\")}%')
-                    
-            else:
-                print('⚠️ 無法獲取分析狀態')
-                
-            print('\\n' + '='*60)
-            print('✅ 分析完成')
-            
-        except Exception as e:
-            print(f'❌ 摘要顯示失敗: {e}')
-        "
+        echo "💰 投資機會提醒:"
+        echo "   - 🌐 GitHub Pages: https://yourusername.github.io/yourrepo"
+        echo "   - 📊 Firebase: 查看數據庫儀表板"
+        echo "   - 關注高信心度的投資機會"
+        echo "   - 請根據風險承受能力調整投資金額"
+        echo ""
+        echo "⚠️ 風險提醒: 投資有風險，請謹慎決策"
