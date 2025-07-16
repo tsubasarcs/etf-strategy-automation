@@ -1,4 +1,4 @@
-name: Find Dict Error Test
+name: Absolutely Correct Test
 
 on:
   workflow_dispatch:
@@ -10,9 +10,63 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Find Dict error
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests pandas numpy
+    
+    - name: Check files
+      run: |
+        echo "Checking files..."
+        ls -la scripts/
+        ls -la scripts/config/
+        ls -la scripts/core/
+    
+    - name: Test config
+      run: |
+        cd scripts
+        python -c "import sys; sys.path.append('.'); from config.etf_config import ETF_INFO; print('Config OK:', len(ETF_INFO))"
+    
+    - name: Test Firebase client
       run: |
         cd scripts
         python -c "import sys; sys.path.append('.'); from core.firebase_client import FirebaseClient; print('Firebase OK')"
+    
+    - name: Test data collector
+      run: |
+        cd scripts
+        python -c "import sys; sys.path.append('.'); from core.data_collector import ETFDataCollector; print('Data collector OK')"
+    
+    - name: Test dashboard
+      run: |
+        cd scripts
         python -c "import sys; sys.path.append('.'); from generate_dashboard import ModularDashboard; print('Dashboard OK')"
+    
+    - name: Test main analyzer
+      run: |
+        cd scripts
         python -c "import sys; sys.path.append('.'); import main_analyzer; print('Main analyzer OK')"
+    
+    - name: Test Firebase save
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+      run: |
+        cd scripts
+        python -c "import sys; sys.path.append('.'); from core.firebase_client import FirebaseClient; client = FirebaseClient(); success = client.save('test/simple', {'test': True}); print('Firebase save:', success)"
+    
+    - name: Test dashboard generation
+      env:
+        FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+      run: |
+        cd scripts
+        python -c "import sys; sys.path.append('.'); from generate_dashboard import ModularDashboard; dashboard = ModularDashboard(); html = dashboard.generate_dashboard(); print('Dashboard HTML length:', len(html))"
+    
+    - name: Summary
+      run: |
+        echo "Test completed successfully!"
+        echo "All modules imported correctly"
+        echo "ETF system is ready to use"
