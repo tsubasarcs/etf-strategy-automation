@@ -1,0 +1,201 @@
+{
+  "config_version": "1.0",
+  "created_date": "2025-07-22T10:00:00Z",
+  "last_updated": "2025-07-22T19:12:50.430457",
+  "update_source": "initial_setup",
+  "confidence_level": "medium",
+  "system_status": "active",
+  "metadata": {
+    "total_etfs": 3,
+    "prediction_horizon_months": 18,
+    "last_api_success": null,
+    "last_manual_update": "2025-07-22T19:12:50.430458",
+    "update_frequency": "daily_check"
+  },
+  "overrides": {
+    "_description": "確認的除息日期，優先級最高",
+    "_example": {
+      "0056": {
+        "confirmed_dates": [
+          "2025-10-15",
+          "2026-01-15"
+        ],
+        "source": "official_announcement",
+        "updated_at": "2025-07-22T10:00:00Z",
+        "confidence": "high",
+        "notes": "官方公告確認"
+      }
+    },
+    "0056": {
+      "confirmed_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "updated_at": "2025-07-22T19:12:50.430453",
+      "confidence": "medium"
+    }
+  },
+  "predictions": {
+    "_description": "基於歷史規律的預測日期",
+    "0056": {
+      "estimated_dates": [
+        "2025-10-15",
+        "2026-01-15",
+        "2026-04-15",
+        "2026-07-15"
+      ],
+      "confidence": "high",
+      "based_on": "historical_pattern_quarterly_15th",
+      "pattern_match": "95%",
+      "last_predicted": "2025-07-22T10:00:00Z"
+    },
+    "00878": {
+      "estimated_dates": [
+        "2025-11-21",
+        "2026-02-20",
+        "2026-05-19",
+        "2026-08-16"
+      ],
+      "confidence": "medium",
+      "based_on": "historical_pattern_variable_dates",
+      "pattern_match": "75%",
+      "last_predicted": "2025-07-22T10:00:00Z",
+      "notes": "日期變化較大，需要API驗證"
+    },
+    "00919": {
+      "estimated_dates": [
+        "2025-12-16",
+        "2026-03-17",
+        "2026-06-17",
+        "2026-09-16"
+      ],
+      "confidence": "high",
+      "based_on": "historical_pattern_quarterly_16-17th",
+      "pattern_match": "90%",
+      "last_predicted": "2025-07-22T10:00:00Z"
+    }
+  },
+  "api_status": {
+    "last_api_attempt": null,
+    "last_successful_update": null,
+    "api_failures": 0,
+    "fallback_mode": false,
+    "next_scheduled_check": "2025-07-23T07:30:00Z"
+  },
+  "manual_updates_log": [
+    {
+      "timestamp": "2025-07-22T10:00:00Z",
+      "action": "initial_setup",
+      "description": "建立初始配置檔案",
+      "user": "system",
+      "affected_etfs": [
+        "0056",
+        "00878",
+        "00919"
+      ]
+    },
+    {
+      "timestamp": "2025-07-22T18:46:27.738190",
+      "action": "update_confirmed_dates",
+      "etf_code": "0056",
+      "new_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "user": "config_manager"
+    },
+    {
+      "timestamp": "2025-07-22T18:53:53.463258",
+      "action": "update_confirmed_dates",
+      "etf_code": "0056",
+      "new_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "user": "config_manager"
+    },
+    {
+      "timestamp": "2025-07-22T19:02:29.888934",
+      "action": "update_confirmed_dates",
+      "etf_code": "0056",
+      "new_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "user": "config_manager"
+    },
+    {
+      "timestamp": "2025-07-22T19:05:36.175792",
+      "action": "update_confirmed_dates",
+      "etf_code": "0056",
+      "new_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "user": "config_manager"
+    },
+    {
+      "timestamp": "2025-07-22T19:12:50.430456",
+      "action": "update_confirmed_dates",
+      "etf_code": "0056",
+      "new_dates": [
+        "2025-10-16",
+        "2026-01-16"
+      ],
+      "source": "test_update",
+      "user": "config_manager"
+    }
+  ],
+  "validation": {
+    "last_validation": "2025-07-22T10:00:00Z",
+    "validation_status": "passed",
+    "issues": [],
+    "warnings": [
+      "00878日期變化較大，建議API驗證"
+    ]
+  },
+  "performance_tracking": {
+    "prediction_accuracy": {
+      "0056": {
+        "correct": 0,
+        "total": 0,
+        "accuracy": null
+      },
+      "00878": {
+        "correct": 0,
+        "total": 0,
+        "accuracy": null
+      },
+      "00919": {
+        "correct": 0,
+        "total": 0,
+        "accuracy": null
+      }
+    },
+    "update_history": {
+      "total_updates": 1,
+      "api_updates": 0,
+      "manual_updates": 1,
+      "successful_updates": 1
+    }
+  },
+  "system_config": {
+    "auto_update_enabled": true,
+    "api_retry_attempts": 3,
+    "backup_to_firebase": true,
+    "notification_enabled": false,
+    "debug_mode": false
+  },
+  "notes": [
+    "此檔案會自動更新，請勿直接編輯除非手動更新",
+    "overrides 中的確認日期優先級最高",
+    "predictions 用於備援和預測",
+    "所有日期格式為 YYYY-MM-DD",
+    "更新來源包括: api_verified, manual_verification, official_announcement"
+  ]
+}
