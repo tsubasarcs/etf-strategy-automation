@@ -1,259 +1,113 @@
-# CLAUDE.md
+### 🔄 ETF策略專案感知與上下文
+- **系統版本**: v2.0 簡化穩定版 - 零API依賴的分層配置系統
+- **核心邏輯**: 基於37個週期100%成功率的除息後1-7天買進策略  
+- **主要目標**: 7.08%平均報酬的自動化投資系統
+- **專案狀態**: 生產就緒，GitHub Actions每日15:30自動執行
+- **Always read the main context document** 開始新對話時優先理解系統架構
+- **Check Firebase數據結構** 在處理數據查詢時參考最新的資料庫結構
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### 🏗️ 代碼結構與模組化 (ETF專案特定)
+- **Never modify files longer than 300 lines** - ETF專案重視穩定性，保持文件精簡
+- **Follow the layered config pattern** - 靜態配置 + 動態配置 + 配置管理器的三層架構
+- **Maintain backward compatibility** - config/__init__.py必須支援舊版API (DIVIDEND_CALENDAR)
+- **Use virtual environment etf-env** 執行任何Python命令時
+- **Respect the directory structure**:
+  ```
+  scripts/config/     # 分層配置系統 - 專案核心
+  scripts/core/       # 核心引擎 (Firebase, 配置管理)
+  scripts/analysis/   # 投資分析邏輯
+  scripts/strategy/   # 策略引擎
+  ```
 
-## Project Overview
+### 🎯 ETF投資邏輯一致性
+- **Always maintain the 1-7 days buy window logic** - 這是37個週期驗證的核心邏輯
+- **Preserve the success rate and return calculations** - 不可修改歷史驗證的績效數據
+- **Keep ETF priority order**: 0056 (priority:1) > 00919 (priority:2) > 00878 (priority:3)
+- **Maintain dividend date prediction patterns** - 基於歷史規律的季度預測邏輯
+- **Follow the layered config approach** - 靜態base_dividend.py + 動態dynamic_dividend.json
 
-ETF策略自動化系統 - An automated ETF dividend investment strategy system that analyzes Taiwan ETFs (0056, 00878, 00713, 00919) for optimal entry points based on historical dividend patterns.
+### 🧪 測試與可靠性 (ETF專案專用)
+- **Always test config system first** - 配置系統是專案核心，優先測試
+- **Use the existing test suites**: `./test_system.sh`, `python check_dependencies.py`
+- **Validate Firebase connectivity** - 確保Firebase儲存和查詢正常
+- **Test with real ETF codes only**: 0056, 00878, 00919 - 不使用模擬數據
+- **Mock external APIs carefully** - 証交所API有SSL問題，測試時需要模擬
 
-### Key Features:
-- Daily automated analysis via GitHub Actions
-- Firebase integration for data storage
-- Technical analysis with RSI, Bollinger Bands, and Volume indicators
-- Risk assessment and opportunity scoring
-- Configuration-based dividend schedule management
+### ✅ 任務完成規則
+- **Check system health after changes** - 修改後執行 `./test_system.sh`
+- **Validate config integrity** - 確保配置系統5/5測試通過
+- **Ensure backward compatibility** - 舊代碼必須能使用DIVIDEND_CALENDAR
+- **Update Firebase structure documentation** - 修改數據結構時更新文檔
 
-## Development Commands
+### 📎 風格與慣例 (ETF專案專用)
+- **Use Python 3.9+** with type hints for better Claude Code compatibility
+- **Follow the existing naming conventions**:
+  - `get_dividend_schedule()` for new API
+  - `DIVIDEND_CALENDAR` for backward compatibility
+  - `latest_modular_status` for Firebase paths
+- **Maintain logging consistency**:
+  ```python
+  print("📊 配置系統載入...")  # 使用emoji prefix
+  print("✅ 成功")            # 成功狀態
+  print("❌ 失敗")            # 錯誤狀態
+  ```
+- **Use ISO datetime format**: "2025-07-22T22:07:00" for all timestamps
+- **Keep decimal precision**: Use 2 decimal places for prices, percentages
 
-### Environment Management
-- `python3 -m venv etf-env` - Create virtual environment
-- `source etf-env/bin/activate` (Linux/Mac) or `etf-env\Scripts\activate` (Windows) - Activate virtual environment
-- `deactivate` - Deactivate virtual environment
-- `./setup.sh` - Complete environment setup with dependencies
-- `pip install -r requirements.txt` - Install dependencies
-- `pip install -r requirements-dev.txt` - Install development dependencies
+### 🔥 Firebase與MCP整合規則
+- **Always preserve Firebase data structure** - 不可破壞現有查詢路徑
+- **Maintain Claude MCP compatibility** - 確保Claude可以直接查詢投資建議
+- **Keep critical paths stable**:
+  - `/latest_modular_status` - 系統狀態和投資機會
+  - `/latest_prices/{ETF}` - ETF最新價格
+  - `/dividend_config/latest` - 除息日程配置
+- **Follow the query patterns** documented in context for optimal Claude interaction
 
-### Package Management
-- `pip install <package>` - Install a package
-- `pip install -e .` - Install project in development mode
-- `pip freeze > requirements.txt` - Generate requirements file
-- `pip-tools compile requirements.in` - Compile requirements with pip-tools
+### 📚 文檔與可解釋性
+- **Update context document** when adding new features or changing architecture
+- **Maintain the investment logic explanations** - 37個週期的績效數據是系統核心價值
+- **Document config system changes** - 分層配置系統是創新點，需詳細記錄
+- **Explain Firebase data structure updates** for Claude MCP queries
 
-### Project-Specific Commands
-- `./start_analysis.sh` - Run ETF analysis
-- `./test_system.sh` - Test configuration and dependencies
-- `cd scripts && python main_analyzer.py` - Manual analysis execution
-- `cd scripts && python test_config_system.py` - Test configuration system
-- `cd scripts && python check_dependencies.py` - Check all dependencies
+### 🧠 AI行為規則 (ETF專項)
+- **Never assume ETF market hours** - 台灣股市有特定交易時間
+- **Never modify historical performance data** - 37週期/7.08%報酬率/100%成功率是事實
+- **Always check dividend date validity** - 除息日期必須符合台灣ETF實際規律
+- **Never break the config layer separation** - 靜態配置與動態配置有明確分工
+- **Respect SSL certificate issues** - 証交所API有已知SSL問題，不強制修復
 
-### Code Quality Commands
-- `black .` - Format code with Black
-- `black --check .` - Check code formatting without changes
-- `isort .` - Sort imports
-- `isort --check-only .` - Check import sorting
-- `flake8` - Run linting with Flake8
-- `pylint src/` - Run linting with Pylint
-- `mypy src/` - Run type checking with MyPy
+### 🚨 ETF專案關鍵限制
+- **Investment advice is reference only** - 系統建議僅供參考，需註明風險
+- **Maintain data source priorities**: Config System > Firebase History > External APIs
+- **Preserve the simplified architecture** - v2.0版本專注穩定性，避免複雜化
+- **Keep GitHub Actions workflow stable** - 生產環境每日運行，變更需謹慎
+- **SSL issues are acceptable** - 數據收集失敗不影響核心投資邏輯
 
-### Development Tools
-- `python -m pip install --upgrade pip` - Upgrade pip
-- `python -c "import sys; print(sys.version)"` - Check Python version
-- `python -m site` - Show Python site information
-- `python -m pdb script.py` - Debug with pdb
+### 💡 ETF專案創新特色
+- **Layered configuration system** - 業界首創的投資策略配置管理
+- **Zero API dependency** - 不依賴不穩定外部API的自主系統
+- **100% success rate validation** - 基於實際歷史數據的策略驗證
+- **Claude MCP integration ready** - 支援AI助手直接查詢投資建議
+- **Automated decision support** - GitHub Actions自動化投資決策支援
 
-## Technology Stack
+---
 
-### Core Technologies
-- **Python** - Primary programming language (3.8+)
-- **pip** - Package management
-- **venv** - Virtual environment management
+## 🎯 工作優先級指引
 
-### Core Dependencies
-- **requests** - HTTP requests for ETF data fetching
-- **pandas** - Data manipulation and analysis
-- **numpy** - Numerical computing for technical indicators
-- **lxml** - XML/HTML parsing
-- **beautifulsoup4** - Web scraping capabilities
+### 🥇 高優先級 (直接影響投資決策)
+1. 配置系統穩定性 - 確保除息日期準確
+2. 投資邏輯正確性 - 維護1-7天買進窗口
+3. Firebase數據完整性 - 保證Claude MCP查詢可用
+4. 系統健康監控 - 確保每日自動執行正常
 
-### Project Components
-- **Firebase Client** - Data storage and retrieval
-- **Configuration Manager** - Dynamic dividend schedule management
-- **Technical Analyzer** - RSI, Bollinger Bands, Volume analysis
-- **Risk Analyzer** - Position sizing and risk assessment
-- **Signal Generator** - Buy/sell signal generation
+### 🥈 中優先級 (改善用戶體驗)  
+1. SSL問題解決 - 改善數據收集穩定性
+2. 測試覆蓋增強 - 提高系統可靠性
+3. 文檔完善 - 便於維護和擴展
+4. 性能優化 - 加快分析執行速度
 
-### Testing Frameworks
-- **pytest** - Testing framework
-- **unittest** - Built-in testing framework
-- **pytest-cov** - Coverage plugin for pytest
-- **factory-boy** - Test fixtures
-- **responses** - Mock HTTP requests
-
-### Code Quality Tools
-- **Black** - Code formatter
-- **isort** - Import sorter
-- **flake8** - Style guide enforcement
-- **pylint** - Code analysis
-- **mypy** - Static type checker
-- **pre-commit** - Git hooks framework
-
-## Project Structure
-
-```
-├── scripts/
-│   ├── main_analyzer.py      # Main entry point
-│   ├── core/
-│   │   ├── config_manager.py # Configuration management
-│   │   ├── data_collector.py # ETF data collection
-│   │   ├── firebase_client.py # Firebase integration
-│   │   └── etf_data_parser.py # Data parsing utilities
-│   ├── analysis/
-│   │   ├── basic_analyzer.py  # Basic price analysis
-│   │   ├── technical_analyzer.py # Technical indicators
-│   │   └── risk_analyzer.py   # Risk assessment
-│   ├── strategy/
-│   │   ├── signal_generator.py # Trading signals
-│   │   └── opportunity_finder.py # Opportunity scoring
-│   └── config/
-│       ├── etf_config.py      # ETF configurations
-│       ├── base_dividend.py   # Base dividend data
-│       └── dynamic_dividend.json # Dynamic updates
-├── .github/workflows/
-│   └── etf-daily.yml         # GitHub Actions workflow
-├── etf-env/                  # Virtual environment
-└── requirements.txt          # Python dependencies
-```
-
-### Naming Conventions
-- **Files/Modules**: Use snake_case (`user_profile.py`)
-- **Classes**: Use PascalCase (`UserProfile`)
-- **Functions/Variables**: Use snake_case (`get_user_data`)
-- **Constants**: Use UPPER_SNAKE_CASE (`API_BASE_URL`)
-- **Private methods**: Prefix with underscore (`_private_method`)
-
-## Python Guidelines
-
-### Type Hints
-- Use type hints for function parameters and return values
-- Import types from `typing` module when needed
-- Use `Optional` for nullable values
-- Use `Union` for multiple possible types
-- Document complex types with comments
-
-### Code Style
-- Follow PEP 8 style guide
-- Use meaningful variable and function names
-- Keep functions focused and single-purpose
-- Use docstrings for modules, classes, and functions
-- Limit line length to 88 characters (Black default)
-
-### Best Practices
-- Use list comprehensions for simple transformations
-- Prefer `pathlib` over `os.path` for file operations
-- Use context managers (`with` statements) for resource management
-- Handle exceptions appropriately with try/except blocks
-- Use `logging` module instead of print statements
-
-## Testing Standards
-
-### Test Structure
-- Organize tests to mirror source code structure
-- Use descriptive test names that explain the behavior
-- Follow AAA pattern (Arrange, Act, Assert)
-- Use fixtures for common test data
-- Group related tests in classes
-
-### Coverage Goals
-- Aim for 90%+ test coverage
-- Write unit tests for business logic
-- Use integration tests for external dependencies
-- Mock external services in tests
-- Test error conditions and edge cases
-
-### pytest Configuration
-```python
-# pytest.ini or pyproject.toml
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "--cov=src --cov-report=term-missing"
-```
-
-## Virtual Environment Setup
-
-### Creation and Activation
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate (Linux/Mac)
-source venv/bin/activate
-
-# Activate (Windows)
-venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-```
-
-### Requirements Management
-- Use `requirements.txt` for production dependencies
-- Use `requirements-dev.txt` for development dependencies
-- Consider using `pip-tools` for dependency resolution
-- Pin versions for reproducible builds
-
-## ETF Configuration System
-
-### Configuration Files
-- `config/etf_config.py` - Static ETF information
-- `config/base_dividend.py` - Historical dividend data
-- `config/dynamic_dividend.json` - Runtime updates
-- `config/strategy_config.py` - Strategy parameters
-
-### Key ETF Information
-```python
-ETF_LIST = ['0056', '00878', '00713', '00919']
-
-# Dividend frequencies
-- 0056: Quarterly (除息月份: 3, 6, 9, 12)
-- 00878: Quarterly (除息月份: 2, 5, 8, 11)
-- 00713: Biannual (除息月份: 7, 12)
-- 00919: Quarterly (除息月份: 3, 6, 9, 12)
-```
-
-### Analysis Parameters
-- RSI Period: 14 days
-- Bollinger Bands: 20-day SMA, 2 std dev
-- Volume Analysis: 20-day average
-- Historical data: 180 days minimum
-
-## Security Guidelines
-
-### Dependencies
-- Regularly update dependencies with `pip list --outdated`
-- Use `safety` package to check for known vulnerabilities
-- Pin dependency versions in requirements files
-- Use virtual environments to isolate dependencies
-
-### Code Security
-- Validate input data with Pydantic or similar
-- Use environment variables for sensitive configuration
-- Implement proper authentication and authorization
-- Sanitize data before database operations
-- Use HTTPS for production deployments
-
-## Development Workflow
-
-### Initial Setup
-1. Run `./setup.sh` to create environment and install dependencies
-2. Verify setup with `./test_system.sh`
-3. Check Firebase credentials if needed
-
-### Daily Operations
-1. GitHub Actions runs automatically at 15:30 Taiwan time
-2. Manual execution: `./start_analysis.sh`
-3. Update dividend dates in `dynamic_dividend.json` as needed
-
-### Key Functions
-- `get_dividend_schedule()` - Get current dividend configuration
-- `collect_etf_data()` - Fetch latest ETF prices
-- `analyze_etf()` - Run complete analysis pipeline
-- `generate_signals()` - Create buy/sell signals
-
-### Testing
-1. Configuration test: `python scripts/test_config_system.py`
-2. Dependency check: `python scripts/check_dependencies.py`
-3. Manual analysis: `cd scripts && python main_analyzer.py`
+### 🥉 低優先級 (功能增強)
+1. 新ETF支援 - 擴展投資標的
+2. 策略模型改進 - 提升預測準確度  
+3. 視覺化增強 - 改善結果呈現
+4. 國際化支援 - 支援其他市場ETF
